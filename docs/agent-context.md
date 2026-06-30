@@ -94,15 +94,15 @@ docs/
   api-reference.md  — All API endpoints
   frontend-guide.md — Frontend patterns + adding new views
 
-REQUIREMENTS.md  — Human-editable requirements (keep updated per standing instruction)
+docs/REQUIREMENTS.md — Human-editable requirements (keep updated per standing instruction)
 ```
 
 ---
 
 ## Standing instructions from the user
 
-- **"In this project ALWAYS update REQUIREMENTS.md when you see new requirements."**
-  Add any new requirement to REQUIREMENTS.md before (or immediately after) implementing it.
+- **"In this project ALWAYS update docs/REQUIREMENTS.md when you see new requirements."**
+  Add any new requirement to `docs/REQUIREMENTS.md` before (or immediately after) implementing it.
 
 - **Use sub-agents. Write documentation as you go to fuel those agents.**
   When spawning a sub-agent, pass relevant sections of `docs/` as context. Keep docs current
