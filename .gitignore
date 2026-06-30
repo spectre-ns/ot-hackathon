@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+kudos_db.json
+.env
+*.egg-info/
+dist/
+build/
+.DS_Store

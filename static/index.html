@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kudos · Recognize your teammates</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎉</text></svg>" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <!-- Login screen -->
+  <div id="login" class="login hidden">
+    <div class="login-card">
+      <div class="login-brand"><span class="logo-mark">🎉</span><span>Kudos</span></div>
+      <h1>Recognize great work.</h1>
+      <p class="login-sub">Give your teammates points for going above and beyond — being a great friend, taming a tough client, or saving the day in a crisis.</p>
+      <a id="github-login-btn" class="btn btn-dark btn-block hidden" href="/auth/github/login">
+        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Sign in with GitHub
+      </a>
+      <div id="demo-login-wrap" class="demo-login">
+        <div class="demo-or"><span>demo sign-in</span></div>
+        <select id="demo-user-select" class="select"></select>
+        <button id="demo-login-btn" class="btn btn-primary btn-block">Enter as this employee</button>
+        <p class="demo-hint">No GitHub app configured — pick any seeded employee to explore.</p>
+      </div>
+    </div>
+    <div class="login-aside">
+      <div class="aside-inner" id="login-aside-feed"></div>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a class="brand" data-route="feed"><span class="logo-mark">🎉</span> Kudos</a>
+        <nav class="nav">
+          <a class="nav-link" data-route="feed">Feed</a>
+          <a class="nav-link" data-route="leaderboard">Leaderboard</a>
+          <a class="nav-link" data-route="people">People</a>
+          <a class="nav-link" data-route="rewards">Rewards</a>
+          <a class="nav-link admin-only hidden" data-route="admin">Admin</a>
+        </nav>
+      </div>
+      <div class="topbar-right">
+        <div class="balance-pill" id="balance-pill" title="Points you have left to give this month">
+          <span class="balance-icon">🎁</span>
+          <span id="giving-balance">–</span><span class="balance-label">to give</span>
+        </div>
+        <div class="notif-wrap">
+          <button class="notif-btn" id="notif-btn" title="Notifications">🔔<span class="notif-badge hidden" id="notif-badge"></span></button>
+          <div class="notif-dropdown hidden" id="notif-dropdown"></div>
+        </div>
+        <button class="btn btn-primary btn-give" id="open-give">＋ Give Kudos</button>
+        <div class="avatar-menu">
+          <button class="avatar-btn" id="avatar-btn"></button>
+          <div class="menu hidden" id="user-menu">
+            <button class="menu-item" data-action="profile">My profile</button>
+            <button class="menu-item" data-action="sync">Sync GitHub activity</button>
+            <button class="menu-item" data-action="logout">Log out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="view" class="view"></main>
+  </div>
+
+  <!-- Give Kudos modal -->
+  <div id="give-modal" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Give Kudos</h2>
+        <button class="icon-btn" id="close-give">✕</button>
+      </div>
+      <form id="give-form" class="give-form">
+        <label class="field">
+          <span>To</span>
+          <select id="give-recipient" class="select" required></select>
+        </label>
+        <label class="field">
+          <span>For being a…</span>
+          <div id="value-chips" class="value-chips"></div>
+        </label>
+        <label class="field">
+          <span>Points <em id="points-hint"></em></span>
+          <div class="points-row">
+            <input type="range" id="points-range" min="1" max="50" value="10" />
+            <input type="number" id="points-number" min="1" max="50" value="10" class="points-number" />
+          </div>
+        </label>
+        <label class="field">
+          <span>Message</span>
+          <textarea id="give-message" rows="3" maxlength="500" placeholder="Tell everyone what they did…" required></textarea>
+        </label>
+        <details class="field artifact-details">
+          <summary style="cursor:pointer;font-weight:600;font-size:14px;color:var(--muted)">🔗 Link an artifact (optional)</summary>
+          <div style="margin-top:12px;display:grid;gap:10px">
+            <input type="url" id="give-artifact-url" class="select" placeholder="https://github.com/…/pull/42" />
+            <input type="text" id="give-artifact-label" class="select" placeholder="Label, e.g. PR #42: Add caching" />
+          </div>
+        </details>
+        <div class="modal-foot">
+          <span class="form-error" id="give-error"></span>
+          <button type="submit" class="btn btn-primary" id="give-submit">Send Kudos 🎉</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <canvas id="confetti" class="confetti hidden"></canvas>
+  <div id="toast-wrap" class="toast-wrap"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
