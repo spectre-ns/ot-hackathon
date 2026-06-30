@@ -100,7 +100,7 @@ If admin-only: `<a class="nav-link admin-only hidden" data-route="myview">My Vie
 
 3. Add component styles to `static/styles.css`.
 
-4. Update `REQUIREMENTS.md`.
+4. Update `docs/requirements.md`.
 
 ---
 

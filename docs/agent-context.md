@@ -94,15 +94,15 @@ docs/
   api-reference.md  — All API endpoints
   frontend-guide.md — Frontend patterns + adding new views
 
-docs/REQUIREMENTS.md — Human-editable requirements (keep updated per standing instruction)
+docs/requirements.md — Human-editable requirements (keep updated per standing instruction)
 ```
 
 ---
 
 ## Standing instructions from the user
 
-- **"In this project ALWAYS update docs/REQUIREMENTS.md when you see new requirements."**
-  Add any new requirement to `docs/REQUIREMENTS.md` before (or immediately after) implementing it.
+- **"In this project ALWAYS update docs/requirements.md when you see new requirements."**
+  Add any new requirement to `docs/requirements.md` before (or immediately after) implementing it.
 
 - **Use sub-agents. Write documentation as you go to fuel those agents.**
   When spawning a sub-agent, pass relevant sections of `docs/` as context. Keep docs current
@@ -118,7 +118,7 @@ docs/REQUIREMENTS.md — Human-editable requirements (keep updated per standing 
 - Frontend: complete `app.js` rewrite covering all features
 - `index.html`: Rewards nav, notification bell, artifact fields in give modal
 - `styles.css`: swag grid, workflow editor, notification bell/dropdown, toggle switch, artifact pills
-- `REQUIREMENTS.md`: updated with all features
+- `docs/requirements.md`: updated with all features
 
 ### Remaining before demo
 - [ ] Start server + reseed + manual smoke-test all views
@@ -139,7 +139,7 @@ admin CRM simulator, admin approvals, admin workflow editor.
 ### "Add a new API endpoint"
 Read `app/main.py` + `app/db.py` + `app/schemas.py`. Add the Pydantic schema to `schemas.py`,
 add the db function to `db.py` (always inside `with _lock:`), add the route to `main.py`.
-Update `REQUIREMENTS.md`.
+Update `docs/requirements.md`.
 
 ### "Add a new frontend view"
 Read `docs/frontend-guide.md`. Add a route to `ROUTES` in `app.js`, add a nav link to
@@ -147,6 +147,6 @@ Read `docs/frontend-guide.md`. Add a route to `ROUTES` in `app.js`, add a nav li
 patterns for consistency.
 
 ### "Write README"
-Read `docs/agent-context.md` + `docs/architecture.md` + `REQUIREMENTS.md`. The README should
+Read `docs/agent-context.md` + `docs/architecture.md` + `docs/requirements.md`. The README should
 cover: what it is, setup steps (venv, pip, seed, run), GitHub OAuth config (optional),
 demo walkthrough, AI tool usage disclosure, architecture blurb.

@@ -191,5 +191,5 @@ static/
   app.js           — Vanilla JS SPA: feed, leaderboard, people, profile, rewards, admin
 
 requirements.txt   — Python dependencies (fastapi, uvicorn, pydantic, httpx, tinydb)
-REQUIREMENTS.md    — This file
+requirements.md    — This file
 ```
