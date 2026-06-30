@@ -161,13 +161,26 @@ Admin view (`ROUTES.admin`) renders sub-tabs and delegates to:
 renderAdminSettings(el, settings)     — point weights, GitHub toggle, CRM weights
 renderCRMSimulator(el)                — fire test CRM events from the UI
 renderAdminOrders(el, pending, all)   — order list with transition buttons
-renderWorkflowEditor(el)              — SVG diagram + state/transition CRUD
+renderWorkflowEditor(el)              — interactive SVG via buildWFDiagram() + Add State form
 renderSwagCatalog(el)                 — item list + add-item form
 ```
 
 Each function is self-contained and re-renders its `el` on mutation (no full page reload).
 
 ---
+
+## Visual workflow editor
+
+`buildWFDiagram(wf, {onDeleteState, onDeleteTransition, onCreateTransition, onHint})` returns a live SVG DOM element (not a string — append with `appendChild`).
+
+Interaction model:
+- **Hover state** → red × delete button at top-right (skipped for initial state)
+- **Click state** → selects it (dashed blue ring); hint text updates
+- **Click another state** → `prompt()` for label + `confirm()` for requires-reason → `onCreateTransition(fromId, toId, label, requiresReason)` called
+- **Click background** → deselects
+- **Hover transition arrow** → arrow turns red, × delete button on label → `onDeleteTransition(id)` called
+
+The callbacks fire the API and call `renderWorkflowEditor(el)` to refresh.
 
 ## Notification bell
 

@@ -114,17 +114,18 @@ docs/requirements.md — Human-editable requirements (keep updated per standing 
 
 ### Done
 - Backend: all routes, data layer, auth, GitHub sync, CRM webhook, swag catalog, workflow engine, notifications
+- `crm_accumulation_enabled` toggle in settings + `earned_points()` (mirrors GitHub toggle; default ON)
 - Seed data: 10 employees, 15 kudos, 12 GitHub contribs, 12 CRM events, 8 swag items, 1 pending order
-- Frontend: complete `app.js` rewrite covering all features
-- `index.html`: Rewards nav, notification bell, artifact fields in give modal
-- `styles.css`: swag grid, workflow editor, notification bell/dropdown, toggle switch, artifact pills
-- `docs/requirements.md`: updated with all features
+- Frontend: complete `app.js` covering all features
+  - Visual workflow editor: interactive SVG (click-to-connect states, hover-to-delete)
+  - Swag inline editing: click cost badge to edit description/cost/stock in place
+  - CRM simulator: artifact URL field; CRM accumulation toggle in Settings
+- 147 tests passing (`make test`)
+- Pushed to https://github.com/spectre-ns/ot-hackathon
 
 ### Remaining before demo
-- [ ] Start server + reseed + manual smoke-test all views
-- [ ] Playwright screenshot verification of all features
-- [ ] Write README.md (setup instructions, GitHub OAuth config, AI-usage notes, demo script)
-- [ ] Ensure GitHub repo is public and pushed
+- [ ] Playwright screenshot verification of all views
+- [ ] Write README.md (setup, OAuth config, AI-usage notes, demo script)
 
 ---
 

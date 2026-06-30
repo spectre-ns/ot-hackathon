@@ -47,7 +47,10 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
   events from any CRM that can send HTTP webhooks.
 - [x] **Six CRM event types**: `deal_closed` (25 pts), `contract_renewed` (20), `escalation_resolved` (15),
   `nps_positive` (10), `ticket_resolved` (8), `customer_call` (5) — all weights admin-configurable.
-- [x] **Admin CRM Simulator** — fire a test CRM event from the UI, see the result live.
+- [x] **CRM auto-accumulation toggle** — admin can enable/disable whether CRM events auto-award points.
+  When disabled, events are recorded but informational only. Defaults to ON (mirrors GitHub toggle).
+- [x] **Admin CRM Simulator** — fire a test CRM event from the UI, including an artifact URL linking
+  to the source CRM record (opportunity, case, etc.).
 - [x] **Salesforce future integration path** documented in code comments — Flow/Apex trigger + Named
   Credential + HTTP Callout Action posting to `/api/crm/event` with `X-CRM-Key`.
 - [x] **Idempotency** — repeated webhook calls for the same `reference_id` refresh, not double-award.
@@ -67,15 +70,18 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - [x] Orders enter a **configurable approval workflow** before fulfillment.
 - [x] Admin can view **all orders** and **pending approvals** in the Admin panel.
 - [x] Admin can **add swag items** (name, description, cost, stock, availability) from the Admin panel.
+- [x] Admin can **edit swag items inline** — click the point-cost badge to reveal an inline edit form
+  for description, point cost, and stock without leaving the page.
 
 ### Configurable workflow manager (JIRA-inspired)
 - [x] **State machine** stored in TinyDB and fully editable via the admin UI.
 - [x] **Default workflow**: Pending → Under Review → Approved → Shipped | Rejected.
-- [x] Admin can **add states** (name, color, terminal flag) and **add transitions** (from, to, label,
-  requires-reason flag) without writing code.
+- [x] Admin can **add states** (name, color, terminal flag) without writing code.
 - [x] Admin can **delete states** and **delete transitions** (initial state is protected from deletion).
 - [x] Each order transition is written to a **full audit log** (who, from, to, reason, timestamp).
-- [x] **SVG workflow diagram** rendered live in the admin panel — updates as states/transitions change.
+- [x] **Interactive visual workflow diagram** — click a state to select it, click another state to
+  draw a transition arrow (prompts for label and requires-reason flag), hover states and arrows to
+  reveal delete buttons directly on the diagram.
 - [x] Transitions can be marked **requires_reason** — UI prompts for a note before advancing.
 
 ### Notification system
@@ -92,7 +98,7 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 ### Recognition & points model
 - [x] **Three distinct balances** per person:
   - [x] **Giving allowance** — points each employee can give away, **resets monthly** (default 100).
-  - [x] **Earned points** — accumulate from kudos received + CRM events + (optionally) GitHub activity.
+  - [x] **Earned points** — accumulate from kudos received + (optionally) CRM events + (optionally) GitHub activity.
   - [x] **Spendable points** — earned minus committed (pending + approved swag orders).
 - [x] Giving is **budget-constrained** — can't give more than your monthly allowance.
 - [x] Can't give kudos **to yourself**.

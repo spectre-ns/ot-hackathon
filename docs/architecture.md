@@ -59,7 +59,7 @@ Tables:
 - `notifications` — user_id, message, kind, link, read, created_at
 
 Key computed values:
-- `earned_points(uid)` = sum of kudos received + CRM contributions + (GitHub if `github_accumulation_enabled`)
+- `earned_points(uid)` = kudos received + (CRM if `crm_accumulation_enabled`) + (GitHub if `github_accumulation_enabled`)
 - `giving_balance(uid)` = monthly_allowance − points given this calendar month
 - `spendable_points(uid)` = earned_points − points in pending/approved swag orders
 
@@ -95,7 +95,7 @@ Workflow state machine helpers:
 ### `app/schemas.py`
 Pydantic v2 request bodies for all endpoints. Key models:
 - `KudosBody` — includes `artifact_url`, `artifact_label`
-- `SettingsBody` — all weights including `github_accumulation_enabled`
+- `SettingsBody` — all weights including `github_accumulation_enabled`, `crm_accumulation_enabled`
 - `CRMEventBody` — webhook payload; `user_identifier` can be github_login or email
 - `SwagOrderBody`, `OrderTransitionBody`, `WorkflowStateBody`, `WorkflowTransitionBody`
 
