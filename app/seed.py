@@ -129,7 +129,7 @@ SWAG_ITEMS = [
      "A $50 Amazon gift card delivered by email.",
      200, "", None),
     ("Standing Desk Mat",
-     "Anti-fatigue mat for standing desks. 30"×20", ergonomic support.",
+     "Anti-fatigue mat for standing desks. 30x20 inches, ergonomic support.",
      250, "", None),
     ("Charity Donation",
      "We'll donate $25 to the charity of your choice in your name.",
