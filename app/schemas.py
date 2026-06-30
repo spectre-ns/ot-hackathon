@@ -27,6 +27,7 @@ class SettingsBody(BaseModel):
     issue_points: int = Field(ge=0, le=1000)
     monthly_allowance: int = Field(ge=0, le=100000)
     github_accumulation_enabled: bool = False
+    crm_accumulation_enabled: bool = True
     crm_deal_closed_points: int = Field(ge=0, le=1000)
     crm_contract_renewed_points: int = Field(ge=0, le=1000)
     crm_escalation_resolved_points: int = Field(ge=0, le=1000)

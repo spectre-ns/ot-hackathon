@@ -258,8 +258,9 @@ def get_settings() -> dict:
                 "issue_points": 5,
                 "monthly_allowance": DEFAULT_MONTHLY_ALLOWANCE,
                 # GitHub accumulation off by default (manual/curated mode).
-                # Admins can enable it to auto-award per merged PR / closed issue.
                 "github_accumulation_enabled": False,
+                # CRM accumulation on by default — CRM events always award points.
+                "crm_accumulation_enabled": True,
                 "crm_api_key": secrets.token_urlsafe(24),
                 **CRM_SETTINGS_DEFAULTS,
             }
@@ -269,6 +270,7 @@ def get_settings() -> dict:
         # Backfill keys added after initial creation (safe on old DBs).
         missing = {
             "github_accumulation_enabled": False,
+            "crm_accumulation_enabled": True,
             "crm_api_key": secrets.token_urlsafe(24),
             **CRM_SETTINGS_DEFAULTS,
         }
@@ -321,11 +323,10 @@ def earned_points(uid: int) -> int:
       When disabled (manual mode), GitHub activity is informational only;
       points for GitHub work come from peer kudos with artifact links.
     """
+    s = get_settings()
     received = sum(k["points"] for k in kudos_received(uid))
-    crm = sum(c["points"] for c in crm_contributions_for(uid))
-    github = 0
-    if get_settings().get("github_accumulation_enabled", False):
-        github = sum(c["points"] for c in contributions_for(uid))
+    crm = sum(c["points"] for c in crm_contributions_for(uid)) if s.get("crm_accumulation_enabled", True) else 0
+    github = sum(c["points"] for c in contributions_for(uid)) if s.get("github_accumulation_enabled", False) else 0
     return received + crm + github
 
 

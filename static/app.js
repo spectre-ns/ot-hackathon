@@ -454,6 +454,17 @@ function renderAdminSettings(el, s) {
           <div><div class="wf-label">Points per closed issue</div></div>
           <input type="number" id="issue_points" min="0" max="1000" value="${s.issue_points}" style="width:96px">
         </div>
+        <h3>CRM activity</h3>
+        <div class="weight-field">
+          <div>
+            <div class="wf-label">CRM auto-accumulation</div>
+            <div class="wf-desc">When ON: CRM webhook events auto-award points. When OFF: CRM events are informational only; points come from manual kudos.</div>
+          </div>
+          <label class="toggle-label">
+            <input type="checkbox" id="crm_accumulation_enabled" ${s.crm_accumulation_enabled!==false?"checked":""}>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
         <h3>CRM event weights</h3>
         ${(state.config.crm_event_types||[]).map(et => `
           <div class="weight-field">
@@ -471,6 +482,7 @@ function renderAdminSettings(el, s) {
       const body = {
         monthly_allowance: parseInt(document.getElementById("monthly_allowance").value, 10),
         github_accumulation_enabled: document.getElementById("github_accumulation_enabled").checked,
+        crm_accumulation_enabled: document.getElementById("crm_accumulation_enabled").checked,
         pr_points: parseInt(document.getElementById("pr_points").value, 10),
         issue_points: parseInt(document.getElementById("issue_points").value, 10),
       };
@@ -521,6 +533,8 @@ function renderCRMSimulator(el) {
         </div>
         <div class="field"><span>Title (optional)</span>
           <input type="text" id="crm-title" placeholder="Auto-generated if blank" class="select" value=""></div>
+        <div class="field"><span>Artifact URL (optional)</span>
+          <input type="url" id="crm-artifact" placeholder="https://crm.example.com/opportunities/OPP-8821" class="select" value=""></div>
         <div class="modal-foot">
           <span class="form-error" id="crm-error"></span>
           <button type="submit" class="btn btn-primary">Fire event</button>
@@ -555,6 +569,7 @@ function renderCRMSimulator(el) {
         reference_id: document.getElementById("crm-ref").value || `SIM-${Date.now()}`,
         company: document.getElementById("crm-company").value,
         title: document.getElementById("crm-title").value,
+        artifact_url: document.getElementById("crm-artifact").value,
         happened_at: new Date().toISOString(),
       });
       const res = document.getElementById("crm-result");
@@ -640,77 +655,74 @@ async function renderWorkflowEditor(el) {
   el.innerHTML = `
     <div class="wf-editor">
       <div class="wf-diagram-wrap">
-        <div class="wf-diagram" id="wf-diagram">${renderWFDiagram(wf)}</div>
+        <div id="wf-canvas"></div>
+        <div class="wf-diagram-hint" id="wf-hint">Click a state to select it, then click another to draw a transition · Hover to delete</div>
       </div>
       <div class="wf-panel">
-        <h4>States</h4>
+        <h4 style="margin:0 0 12px">Add State</h4>
+        <form id="add-state-form" style="margin-bottom:16px">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <input type="text" id="ns-name" placeholder="State name" class="select" style="flex:1">
+            <input type="color" id="ns-color" value="#4D75FE" style="width:38px;height:38px;border-radius:8px;border:1px solid var(--line);padding:2px;cursor:pointer">
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <label style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" id="ns-terminal"> terminal state
+            </label>
+            <button class="btn btn-primary" type="submit" style="padding:8px 16px;font-size:13px">Add state</button>
+          </div>
+        </form>
+        <hr style="border:0;border-top:1px solid var(--line);margin:0 0 14px">
+        <h4 style="margin:0 0 10px">States</h4>
         <div id="wf-states-list">
           ${wf.states.map(s => `
             <div class="wf-state-row" style="border-left:3px solid ${s.color}">
               <span class="wf-state-chip" style="background:${s.color}20;color:${s.color}">${esc(s.name)}</span>
-              <span style="font-size:11px;color:var(--muted)">${s.is_initial?"initial":""}${s.is_terminal?" · terminal":""}</span>
-              ${!s.is_initial?`<button class="icon-btn wf-del-state" data-sid="${s.id}" title="Delete state">✕</button>`:""}
+              <span style="font-size:11px;color:var(--muted);margin-left:auto">${s.is_initial?"initial":""}${s.is_terminal?" terminal":""}</span>
             </div>`).join("")}
         </div>
-        <form id="add-state-form" style="margin-top:12px">
-          <div style="display:flex;gap:8px;align-items:center">
-            <input type="text" id="ns-name" placeholder="State name" class="select" style="flex:1">
-            <input type="color" id="ns-color" value="#4D75FE" style="width:38px;height:38px;border-radius:8px;border:1px solid var(--line);padding:2px">
-            <label style="font-size:13px;display:flex;align-items:center;gap:4px;white-space:nowrap">
-              <input type="checkbox" id="ns-terminal"> terminal
-            </label>
-            <button class="btn btn-primary" type="submit" style="padding:8px 14px;font-size:13px">Add</button>
-          </div>
-        </form>
-        <h4 style="margin-top:20px">Transitions</h4>
-        <div id="wf-trans-list">
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <h4 style="margin:0 0 10px">Transitions</h4>
+        <div id="wf-trans-list" style="font-size:13px;color:var(--muted)">
           ${wf.transitions.map(t => {
             const fs = wf.states.find(s=>s.id===t.from)||{name:t.from,color:"#888"};
-            const ts = wf.states.find(s=>s.id===t.to)||{name:t.to,color:"#888"};
-            return `
-            <div class="wf-trans-row">
-              <span class="wf-state-chip" style="background:${fs.color}20;color:${fs.color};font-size:12px">${esc(fs.name)}</span>
-              <span style="font-size:13px;color:var(--muted)">→</span>
-              <span class="wf-state-chip" style="background:${ts.color}20;color:${ts.color};font-size:12px">${esc(ts.name)}</span>
-              <span style="font-size:12px;flex:1;color:var(--text)">${esc(t.label)}</span>
-              ${t.requires_reason?`<span style="font-size:11px;color:var(--muted)">reason req.</span>`:""}
-              <button class="icon-btn wf-del-trans" data-tid="${t.id}" title="Delete transition">✕</button>
+            const ts2 = wf.states.find(s=>s.id===t.to)||{name:t.to,color:"#888"};
+            return `<div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px">
+              <span style="color:${fs.color};font-weight:600">${esc(fs.name)}</span>
+              <span>→</span>
+              <span style="color:${ts2.color};font-weight:600">${esc(ts2.name)}</span>
+              <span style="flex:1;color:var(--muted);font-size:12px"> (${esc(t.label)})</span>
             </div>`;
-          }).join("")}
+          }).join("") || '<div style="color:var(--muted);font-size:13px">No transitions yet.</div>'}
         </div>
-        <form id="add-trans-form" style="margin-top:12px">
-          <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:8px">
-            <select id="nt-from" class="select">
-              ${wf.states.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}
-            </select>
-            <span style="font-size:18px;color:var(--muted)">→</span>
-            <select id="nt-to" class="select">
-              ${wf.states.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}
-            </select>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input type="text" id="nt-label" placeholder="Transition label" class="select" style="flex:1">
-            <label style="font-size:13px;display:flex;align-items:center;gap:4px;white-space:nowrap">
-              <input type="checkbox" id="nt-reason"> reason req.
-            </label>
-            <button class="btn btn-primary" type="submit" style="padding:8px 14px;font-size:13px">Add</button>
-          </div>
-        </form>
       </div>
     </div>`;
 
-  // Delete state
-  el.querySelectorAll(".wf-del-state").forEach(btn => btn.addEventListener("click", async () => {
-    if (!confirm(`Delete state "${btn.dataset.sid}"?`)) return;
-    try { await api.delete(`/api/workflow/states/${btn.dataset.sid}`); renderWorkflowEditor(el); }
-    catch(e) { toast(e.message, "error"); }
+  // Mount interactive SVG diagram
+  const canvas = document.getElementById("wf-canvas");
+  const hintEl = document.getElementById("wf-hint");
+  canvas.appendChild(buildWFDiagram(wf, {
+    onDeleteState: async id => {
+      try { await api.delete(`/api/workflow/states/${id}`); renderWorkflowEditor(el); }
+      catch(e) { toast(e.message, "error"); }
+    },
+    onDeleteTransition: async id => {
+      try { await api.delete("/api/workflow/transitions", {transition_id: id}); renderWorkflowEditor(el); }
+      catch(e) { toast(e.message, "error"); }
+    },
+    onCreateTransition: async (fromId, toId, label, requiresReason) => {
+      try {
+        await api.post("/api/workflow/transitions", {
+          from_state: fromId, to_state: toId, label,
+          requires_admin: true, requires_reason: requiresReason,
+        });
+        renderWorkflowEditor(el);
+      } catch(e) { toast(e.message, "error"); }
+    },
+    onHint: text => { hintEl.textContent = text; },
   }));
-  // Delete transition
-  el.querySelectorAll(".wf-del-trans").forEach(btn => btn.addEventListener("click", async () => {
-    try { await api.delete("/api/workflow/transitions", {transition_id: btn.dataset.tid}); renderWorkflowEditor(el); }
-    catch(e) { toast(e.message, "error"); }
-  }));
-  // Add state
+
+  // Add state form
   document.getElementById("add-state-form").addEventListener("submit", async e => {
     e.preventDefault();
     const name = document.getElementById("ns-name").value.trim();
@@ -723,67 +735,275 @@ async function renderWorkflowEditor(el) {
       renderWorkflowEditor(el);
     } catch(err) { toast(err.message, "error"); }
   });
-  // Add transition
-  document.getElementById("add-trans-form").addEventListener("submit", async e => {
-    e.preventDefault();
-    const label = document.getElementById("nt-label").value.trim();
-    if (!label) return;
-    try {
-      await api.post("/api/workflow/transitions", {
-        from_state: document.getElementById("nt-from").value,
-        to_state: document.getElementById("nt-to").value,
-        label, requires_admin: true,
-        requires_reason: document.getElementById("nt-reason").checked,
-      });
-      renderWorkflowEditor(el);
-    } catch(err) { toast(err.message, "error"); }
-  });
 }
 
-function renderWFDiagram(wf) {
-  // SVG flow diagram of the workflow states and transitions
-  const states = wf.states;
-  const n = states.length;
-  const W = 120, H = 44, GAP_X = 60, GAP_Y = 70;
-  // Layout: arrange in rows of 3
-  const cols = Math.min(n, 3);
-  const rows = Math.ceil(n / cols);
-  const svgW = cols * W + (cols - 1) * GAP_X + 40;
-  const svgH = rows * H + (rows - 1) * GAP_Y + 40;
+// Builds and returns an interactive SVG workflow diagram DOM element.
+// Interaction model:
+//   • Hover a state  → delete button (×) appears at top-right corner
+//   • Click a state  → selects it (blue ring); hint updates
+//   • Click another  → prompts for transition label → creates transition
+//   • Click bg       → deselects
+//   • Hover a transition arrow → label highlights red, × delete button appears
+function buildWFDiagram(wf, {onDeleteState, onDeleteTransition, onCreateTransition, onHint}) {
+  const NS = "http://www.w3.org/2000/svg";
+  const states = wf.states, transitions = wf.transitions;
+  const W = 136, H = 50, GX = 90, GY = 92;
+  const cols = Math.min(Math.max(states.length, 1), 3);
+  const rows = Math.ceil(states.length / cols);
+  const SVG_W = cols * W + (cols - 1) * GX + 48;
+  const SVG_H = rows * H + (rows - 1) * GY + 56;
+
+  // Compute grid positions
   const pos = {};
   states.forEach((s, i) => {
-    const col = i % cols, row = Math.floor(i / cols);
-    pos[s.id] = {
-      x: 20 + col * (W + GAP_X),
-      y: 20 + row * (H + GAP_Y),
-    };
+    pos[s.id] = {x: 24 + (i % cols) * (W + GX), y: 20 + Math.floor(i / cols) * (H + GY)};
   });
-  const stateRects = states.map(s => {
-    const {x, y} = pos[s.id];
-    return `<g>
-      <rect x="${x}" y="${y}" width="${W}" height="${H}" rx="10"
-        fill="${s.color}22" stroke="${s.color}" stroke-width="2"/>
-      ${s.is_initial?`<polygon points="${x-10},${y+H/2} ${x-4},${y+H/2-6} ${x-4},${y+H/2+6}" fill="${s.color}"/>`:""}
-      <text x="${x+W/2}" y="${y+H/2+5}" text-anchor="middle" font-size="13" font-weight="600" fill="${s.color}">${esc(s.name)}</text>
-      ${s.is_terminal?`<circle cx="${x+W-8}" cy="${y+8}" r="5" fill="${s.color}"/>`:""}</g>`;
-  }).join("");
-  const arrows = wf.transitions.map(t => {
-    const fp = pos[t.from], tp = pos[t.to];
-    if (!fp || !tp) return "";
-    const x1 = fp.x + W/2, y1 = fp.y + H;
-    const x2 = tp.x + W/2, y2 = tp.y;
-    const mx = (x1+x2)/2, my = (y1+y2)/2;
-    const dx = x2-x1, dy = y2-y1;
-    const mx2 = mx - dy*0.15, my2 = my + dx*0.15;
-    return `<g>
-      <path d="M${x1},${y1} Q${mx2},${my2} ${x2},${y2}" fill="none" stroke="#aaa" stroke-width="1.5" marker-end="url(#arr)"/>
-      <text x="${mx2}" y="${my2}" text-anchor="middle" font-size="10" fill="var(--muted)">${esc(t.label)}</text></g>`;
-  }).join("");
-  return `<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" style="max-width:100%">
-    <defs><marker id="arr" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
-      <path d="M0,0 L8,3 L0,6 Z" fill="#aaa"/></marker></defs>
-    ${arrows}${stateRects}
-  </svg>`;
+
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("width", SVG_W); svg.setAttribute("height", SVG_H);
+  svg.setAttribute("viewBox", `0 0 ${SVG_W} ${SVG_H}`);
+  svg.style.cssText = "max-width:100%;cursor:default;display:block;overflow:visible";
+
+  // Arrow marker defs
+  const defs = document.createElementNS(NS, "defs");
+  ["wfarr","wfarr-red"].forEach((id, ri) => {
+    const m = document.createElementNS(NS, "marker");
+    m.setAttribute("id", id); m.setAttribute("markerWidth","8");
+    m.setAttribute("markerHeight","6"); m.setAttribute("refX","6");
+    m.setAttribute("refY","3"); m.setAttribute("orient","auto");
+    const p = document.createElementNS(NS, "path");
+    p.setAttribute("d","M0,0 L8,3 L0,6 Z");
+    p.setAttribute("fill", ri===0?"#ccc":"#d6502f");
+    m.appendChild(p); defs.appendChild(m);
+  });
+  svg.appendChild(defs);
+
+  // Layers: transitions behind states
+  const tLayer = document.createElementNS(NS, "g");
+  const sLayer = document.createElementNS(NS, "g");
+  svg.appendChild(tLayer); svg.appendChild(sLayer);
+
+  let selectedId = null;
+
+  function hint(text) { if (onHint) onHint(text); }
+  function deselect() {
+    selectedId = null;
+    svg.style.cursor = "default";
+    sLayer.querySelectorAll(".sel-ring").forEach(r => r.setAttribute("display","none"));
+    hint("Click a state to select it, then click another to draw a transition · Hover to delete");
+  }
+
+  // ---- Draw transitions ----
+  function drawTransitions() {
+    while (tLayer.firstChild) tLayer.removeChild(tLayer.lastChild);
+    transitions.forEach(t => {
+      const fp = pos[t.from], tp = pos[t.to];
+      if (!fp || !tp) return;
+
+      // Compute bezier path from bottom-centre of `from` to top-centre of `to`
+      let d, lx, ly;
+      if (t.from === t.to) {
+        // Self-loop
+        const cx = fp.x + W, cy = fp.y + H / 2;
+        d = `M${fp.x+W-4},${fp.y+H/2-8} C${cx+48},${cy-40} ${cx+48},${cy+40} ${fp.x+W-4},${fp.y+H/2+8}`;
+        lx = cx + 54; ly = cy;
+      } else {
+        const ox = fp.x + W/2, oy = fp.y + H;
+        const ix = tp.x + W/2, iy = tp.y;
+        const mx = (ox+ix)/2, my = (oy+iy)/2;
+        const dxn = ix-ox, dyn = iy-oy;
+        const len = Math.sqrt(dxn*dxn+dyn*dyn)||1;
+        const bend = Math.min(len*0.28, 55);
+        const cx = mx - (dyn/len)*bend, cy = my + (dxn/len)*bend;
+        d = `M${ox},${oy} Q${cx},${cy} ${ix},${iy}`;
+        lx = (ox + 2*cx + ix)/4; ly = (oy + 2*cy + iy)/4;
+      }
+
+      const g = document.createElementNS(NS, "g");
+      g.style.cursor = "pointer";
+
+      const path = document.createElementNS(NS, "path");
+      path.setAttribute("d",d); path.setAttribute("fill","none");
+      path.setAttribute("stroke","#ccc"); path.setAttribute("stroke-width","2");
+      path.setAttribute("marker-end","url(#wfarr)");
+
+      // Wide transparent hit-area
+      const hit = path.cloneNode();
+      hit.setAttribute("stroke","transparent"); hit.setAttribute("stroke-width","14");
+      hit.removeAttribute("marker-end");
+
+      // Label background + text
+      const tw = Math.max(t.label.length * 6.8 + 16, 40);
+      const lbg = document.createElementNS(NS, "rect");
+      lbg.setAttribute("x",lx-tw/2); lbg.setAttribute("y",ly-9);
+      lbg.setAttribute("width",tw); lbg.setAttribute("height",17);
+      lbg.setAttribute("rx","5"); lbg.setAttribute("fill","#fff");
+      lbg.setAttribute("stroke","#e5e5e5");
+      const ltxt = document.createElementNS(NS, "text");
+      ltxt.setAttribute("x",lx); ltxt.setAttribute("y",ly+4);
+      ltxt.setAttribute("text-anchor","middle"); ltxt.setAttribute("font-size","11");
+      ltxt.setAttribute("fill","#888"); ltxt.setAttribute("pointer-events","none");
+      ltxt.textContent = t.label;
+
+      // Delete × circle (hidden by default)
+      const delG = document.createElementNS(NS, "g");
+      delG.setAttribute("display","none"); delG.style.cursor = "pointer";
+      const dc = document.createElementNS(NS, "circle");
+      dc.setAttribute("cx", lx+tw/2+10); dc.setAttribute("cy", ly-8);
+      dc.setAttribute("r","9"); dc.setAttribute("fill","#d6502f");
+      const dt = document.createElementNS(NS, "text");
+      dt.setAttribute("x", lx+tw/2+10); dt.setAttribute("y", ly-3);
+      dt.setAttribute("text-anchor","middle"); dt.setAttribute("font-size","13");
+      dt.setAttribute("fill","#fff"); dt.setAttribute("font-weight","bold");
+      dt.setAttribute("pointer-events","none"); dt.textContent="×";
+      delG.appendChild(dc); delG.appendChild(dt);
+      delG.addEventListener("click", e => {
+        e.stopPropagation();
+        if (confirm(`Delete transition "${t.label}"?`)) onDeleteTransition(t.id);
+      });
+
+      g.appendChild(path); g.appendChild(hit); g.appendChild(lbg); g.appendChild(ltxt); g.appendChild(delG);
+      g.addEventListener("mouseenter", () => {
+        path.setAttribute("stroke","#d6502f"); path.setAttribute("stroke-width","2.5");
+        path.setAttribute("marker-end","url(#wfarr-red)");
+        ltxt.setAttribute("fill","#d6502f"); delG.setAttribute("display","");
+      });
+      g.addEventListener("mouseleave", () => {
+        path.setAttribute("stroke","#ccc"); path.setAttribute("stroke-width","2");
+        path.setAttribute("marker-end","url(#wfarr)");
+        ltxt.setAttribute("fill","#888"); delG.setAttribute("display","none");
+      });
+      tLayer.appendChild(g);
+    });
+  }
+
+  // ---- Draw states ----
+  states.forEach(s => {
+    const p = pos[s.id];
+    const g = document.createElementNS(NS, "g");
+    g.style.cursor = "pointer";
+
+    // Initial-state indicator triangle
+    if (s.is_initial) {
+      const tri = document.createElementNS(NS, "polygon");
+      tri.setAttribute("points",`${p.x-15},${p.y+H/2} ${p.x-4},${p.y+H/2-8} ${p.x-4},${p.y+H/2+8}`);
+      tri.setAttribute("fill",s.color); tri.setAttribute("pointer-events","none");
+      g.appendChild(tri);
+    }
+
+    // Main rectangle
+    const rect = document.createElementNS(NS, "rect");
+    rect.setAttribute("x",p.x); rect.setAttribute("y",p.y);
+    rect.setAttribute("width",W); rect.setAttribute("height",H);
+    rect.setAttribute("rx","13"); rect.setAttribute("fill",s.color+"1e");
+    rect.setAttribute("stroke",s.color); rect.setAttribute("stroke-width","2");
+
+    // Selection ring (shown when selected)
+    const selRing = document.createElementNS(NS, "rect");
+    selRing.classList.add("sel-ring");
+    selRing.setAttribute("x",p.x-4); selRing.setAttribute("y",p.y-4);
+    selRing.setAttribute("width",W+8); selRing.setAttribute("height",H+8);
+    selRing.setAttribute("rx","17"); selRing.setAttribute("fill","none");
+    selRing.setAttribute("stroke","#4D75FE"); selRing.setAttribute("stroke-width","2.5");
+    selRing.setAttribute("stroke-dasharray","6 4"); selRing.setAttribute("display","none");
+    selRing.setAttribute("pointer-events","none");
+
+    // Name label
+    const txt = document.createElementNS(NS, "text");
+    txt.setAttribute("x",p.x+W/2); txt.setAttribute("y",p.y+H/2+5);
+    txt.setAttribute("text-anchor","middle"); txt.setAttribute("font-size","13");
+    txt.setAttribute("font-weight","700"); txt.setAttribute("fill",s.color);
+    txt.setAttribute("pointer-events","none"); txt.textContent=s.name;
+
+    // Terminal state double-ring at top-right
+    if (s.is_terminal) {
+      [9,5].forEach((r,i) => {
+        const c = document.createElementNS(NS,"circle");
+        c.setAttribute("cx",p.x+W-13); c.setAttribute("cy",p.y+13);
+        c.setAttribute("r",r); c.setAttribute("pointer-events","none");
+        i===0 ? (c.setAttribute("fill","none"),c.setAttribute("stroke",s.color),c.setAttribute("stroke-width","1.5"))
+               : c.setAttribute("fill",s.color);
+        g.appendChild(c);
+      });
+    }
+
+    // Delete button (non-initial only)
+    const delG = document.createElementNS(NS, "g");
+    delG.setAttribute("display","none"); delG.style.cursor="pointer";
+    if (!s.is_initial) {
+      const dc = document.createElementNS(NS,"circle");
+      dc.setAttribute("cx",p.x+W+2); dc.setAttribute("cy",p.y-2);
+      dc.setAttribute("r","10"); dc.setAttribute("fill","#d6502f");
+      const dt = document.createElementNS(NS,"text");
+      dt.setAttribute("x",p.x+W+2); dt.setAttribute("y",p.y+3);
+      dt.setAttribute("text-anchor","middle"); dt.setAttribute("font-size","14");
+      dt.setAttribute("fill","#fff"); dt.setAttribute("font-weight","bold");
+      dt.setAttribute("pointer-events","none"); dt.textContent="×";
+      delG.appendChild(dc); delG.appendChild(dt);
+      delG.addEventListener("click", e => {
+        e.stopPropagation();
+        if (confirm(`Delete state "${s.name}"?`)) onDeleteState(s.id);
+      });
+    }
+
+    // "Connect" ring shown when another state is selected
+    const connRing = document.createElementNS(NS, "rect");
+    connRing.setAttribute("x",p.x-6); connRing.setAttribute("y",p.y-6);
+    connRing.setAttribute("width",W+12); connRing.setAttribute("height",H+12);
+    connRing.setAttribute("rx","19"); connRing.setAttribute("fill","#4D75FE18");
+    connRing.setAttribute("stroke","#4D75FE"); connRing.setAttribute("stroke-width","2");
+    connRing.setAttribute("stroke-dasharray","5 3"); connRing.setAttribute("display","none");
+    connRing.setAttribute("pointer-events","none");
+
+    g.appendChild(selRing); g.appendChild(connRing); g.appendChild(rect);
+    g.appendChild(txt); g.appendChild(delG);
+
+    g.addEventListener("mouseenter", () => {
+      if (selectedId !== s.id) rect.setAttribute("stroke-width","3");
+      if (!selectedId && !s.is_initial) delG.setAttribute("display","");
+      if (selectedId && selectedId !== s.id) connRing.setAttribute("display","");
+    });
+    g.addEventListener("mouseleave", () => {
+      if (selectedId !== s.id) rect.setAttribute("stroke-width","2");
+      delG.setAttribute("display","none"); connRing.setAttribute("display","none");
+    });
+    g.addEventListener("click", e => {
+      e.stopPropagation();
+      if (selectedId && selectedId !== s.id) {
+        // Create transition: selectedId → s.id
+        const fromName = states.find(x=>x.id===selectedId)?.name||selectedId;
+        const label = prompt(`Transition label:\n"${fromName}" → "${s.name}"`);
+        if (label && label.trim()) {
+          const requiresReason = confirm(`Does "${label.trim()}" require a reason?`);
+          onCreateTransition(selectedId, s.id, label.trim(), requiresReason);
+        }
+        deselect();
+      } else if (selectedId === s.id) {
+        deselect();
+      } else {
+        selectedId = s.id;
+        svg.style.cursor = "crosshair";
+        sLayer.querySelectorAll(".sel-ring").forEach(r => r.setAttribute("display","none"));
+        selRing.setAttribute("display","");
+        rect.setAttribute("stroke-width","3");
+        hint(`"${s.name}" selected — click another state to connect, or click again to deselect`);
+      }
+    });
+
+    sLayer.appendChild(g);
+  });
+
+  // Hint text at bottom of diagram
+  const hintTxt = document.createElementNS(NS,"text");
+  hintTxt.setAttribute("x", SVG_W/2); hintTxt.setAttribute("y", SVG_H-6);
+  hintTxt.setAttribute("text-anchor","middle"); hintTxt.setAttribute("font-size","11");
+  hintTxt.setAttribute("fill","#bbb"); hintTxt.setAttribute("pointer-events","none");
+  hintTxt.textContent="diagram";
+  svg.appendChild(hintTxt);
+
+  svg.addEventListener("click", deselect);
+  drawTransitions();
+  return svg;
 }
 
 // ---- Admin: Swag catalog management ----
@@ -794,14 +1014,25 @@ async function renderSwagCatalog(el) {
       <h3 style="margin-top:0">Swag Catalog</h3>
       <div id="catalog-list">
         ${items.map(item => `
-          <div class="weight-field" style="align-items:flex-start;gap:12px">
-            <div>
+          <div class="weight-field swag-item-row" style="align-items:flex-start;gap:12px" data-item-id="${item.id}">
+            <div style="flex:1">
               <div class="wf-label">${esc(item.name)}</div>
               <div class="wf-desc">${esc(item.description)}</div>
             </div>
             <div style="text-align:right;flex-shrink:0">
-              <div class="points-badge" style="display:inline-block">${item.point_cost} pts</div>
+              <span class="points-badge swag-cost-display" style="display:inline-block;cursor:pointer" title="Click to edit">${item.point_cost} pts ✏️</span>
               <div style="font-size:12px;color:var(--muted);margin-top:4px">${item.stock!=null?item.stock+" in stock":"unlimited"} · ${item.is_available?"available":"hidden"}</div>
+            </div>
+          </div>
+          <div class="swag-edit-inline hidden" id="swag-edit-${item.id}" data-item-id="${item.id}">
+            <div style="display:grid;grid-template-columns:1fr 100px 100px auto;gap:10px;align-items:end;padding:10px 0">
+              <div class="field" style="margin:0"><span>Description</span><input type="text" class="select sedit-desc" value="${esc(item.description)}" style="font-size:14px"></div>
+              <div class="field" style="margin:0"><span>Points</span><input type="number" class="select sedit-cost" value="${item.point_cost}" min="1" style="font-size:14px"></div>
+              <div class="field" style="margin:0"><span>Stock</span><input type="number" class="select sedit-stock" value="${item.stock!=null?item.stock:""}" min="0" placeholder="∞" style="font-size:14px"></div>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-primary sedit-save" style="font-size:13px;padding:10px 14px">Save</button>
+                <button class="btn btn-ghost sedit-cancel" style="font-size:13px;padding:10px 12px">✕</button>
+              </div>
             </div>
           </div>`).join("")}
       </div>
@@ -824,6 +1055,42 @@ async function renderSwagCatalog(el) {
         </div>
       </form>
     </div>`;
+
+  // Toggle inline edit panel on cost badge click
+  el.querySelectorAll(".swag-cost-display").forEach(badge => {
+    const row = badge.closest(".swag-item-row");
+    const itemId = row.dataset.itemId;
+    badge.addEventListener("click", () => {
+      const editRow = document.getElementById(`swag-edit-${itemId}`);
+      editRow.classList.toggle("hidden");
+    });
+  });
+  // Save edits
+  el.querySelectorAll(".sedit-save").forEach(btn => {
+    const editRow = btn.closest(".swag-edit-inline");
+    const itemId = editRow.dataset.itemId;
+    const origItem = items.find(i => String(i.id) === String(itemId));
+    btn.addEventListener("click", async () => {
+      const stockVal = editRow.querySelector(".sedit-stock").value;
+      try {
+        await api.put(`/api/swag/${itemId}`, {
+          name: origItem.name,
+          description: editRow.querySelector(".sedit-desc").value,
+          point_cost: parseInt(editRow.querySelector(".sedit-cost").value, 10),
+          stock: stockVal ? parseInt(stockVal, 10) : null,
+          is_available: origItem.is_available,
+          image_url: origItem.image_url || "",
+        });
+        toast("Item updated", "success");
+        renderSwagCatalog(el);
+      } catch(err) { toast(err.message, "error"); }
+    });
+  });
+  // Cancel edits
+  el.querySelectorAll(".sedit-cancel").forEach(btn => {
+    btn.addEventListener("click", () => btn.closest(".swag-edit-inline").classList.add("hidden"));
+  });
+
   document.getElementById("add-swag-form").addEventListener("submit", async e => {
     e.preventDefault();
     const stockVal = document.getElementById("swag-stock").value;
