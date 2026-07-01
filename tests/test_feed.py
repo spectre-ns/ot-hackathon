@@ -48,19 +48,23 @@ class TestFeed:
         assert item["receiver"] is not None
 
     def test_feed_sorted_newest_first(self, user1_client, users):
+        import app.db as adb
+        from datetime import datetime, timedelta, timezone
         receiver = users["user2"]
-        for msg in ["first", "second", "third"]:
-            user1_client.post("/api/kudos", json={
-                "receiver_id": receiver["id"],
-                "points": 1,
-                "value_key": "mentor",
-                "message": msg,
-            })
+        giver = users["user1"]
+        now = datetime.now(timezone.utc)
+        # Insert with explicit timestamps so ordering is deterministic on fast hardware
+        adb.create_kudos(giver["id"], receiver["id"], 1, "mentor", "first",
+                         created_at=(now - timedelta(minutes=2)).isoformat())
+        adb.create_kudos(giver["id"], receiver["id"], 1, "mentor", "second",
+                         created_at=(now - timedelta(minutes=1)).isoformat())
+        adb.create_kudos(giver["id"], receiver["id"], 1, "mentor", "third",
+                         created_at=now.isoformat())
         resp = user1_client.get("/api/feed")
         messages = [item["message"] for item in resp.json()]
         # Most recently created is first; all three should be present
         assert set(messages) == {"first", "second", "third"}
-        # The last one added should appear first (newest-first ordering)
+        # The last one added (with the latest timestamp) should appear first
         assert messages[0] == "third"
 
     def test_feed_limit_param(self, user1_client, users):

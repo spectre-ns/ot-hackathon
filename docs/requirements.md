@@ -31,6 +31,7 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - [x] **OpenTeams color palette** (navy `#000F3A`, brand blue `#4D75FE`, coral `#FF8A69`, gold `#FAA944`).
 - [x] **Airbnb-style minimal** frontend (whitespace, white cards, hairline borders, restrained color).
 - [x] This **human-editable requirements document** (Markdown bullets, implicit + explicit).
+- [x] **Browser history navigation** — back and forward buttons work correctly; each route change pushes a history entry and `popstate` restores the correct view and arguments.
 
 ### GitHub integration
 - [x] **GitHub login** for users (OAuth), so accounts map to GitHub identities.
@@ -49,6 +50,7 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
   `nps_positive` (10), `ticket_resolved` (8), `customer_call` (5) — all weights admin-configurable.
 - [x] **CRM auto-accumulation toggle** — admin can enable/disable whether CRM events auto-award points.
   When disabled, events are recorded but informational only. Defaults to ON (mirrors GitHub toggle).
+  Toggle correctly gates CRM points in both the "all-time" and "this month" leaderboard periods.
 - [x] **Admin CRM Simulator** — fire a test CRM event from the UI, including an artifact URL linking
   to the source CRM record (opportunity, case, etc.).
 - [x] **Salesforce future integration path** documented in code comments — Flow/Apex trigger + Named
@@ -70,8 +72,13 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - [x] Orders enter a **configurable approval workflow** before fulfillment.
 - [x] Admin can view **all orders** and **pending approvals** in the Admin panel.
 - [x] Admin can **add swag items** (name, description, cost, stock, availability) from the Admin panel.
-- [x] Admin can **edit swag items inline** — click the point-cost badge to reveal an inline edit form
-  for description, point cost, and stock without leaving the page.
+- [x] Admin can **edit swag items inline** — each catalog row shows a description textarea, cost
+  input, stock select ("Unlimited" / "Track stock" with optional qty), availability toggle, and
+  Save button directly in the table; no separate expand panel or edit button required.
+- [x] **Swag card image thumbnails** — each catalog card shows a large visual thumbnail; falls back to
+  a styled emoji on a colored background if no `image_url` is set.
+- [x] **Visual workflow stepper on orders** — each order card (user "My Orders" tab and admin Approvals
+  tab) shows a horizontal progress bar through all workflow states, color-coded and labeled.
 
 ### Configurable workflow manager (JIRA-inspired)
 - [x] **State machine** stored in TinyDB and fully editable via the admin UI.
@@ -83,13 +90,19 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
   draw a transition arrow (prompts for label and requires-reason flag), hover states and arrows to
   reveal delete buttons directly on the diagram.
 - [x] Transitions can be marked **requires_reason** — UI prompts for a note before advancing.
+- [x] **Styled transition creation dialog** — clicking a state in the workflow diagram to draw a
+  transition opens a `.modal-overlay` / `.modal-card` dialog (label input + "Requires a reason"
+  toggle; Enter to submit, Escape or overlay-click to cancel) instead of browser `prompt()`.
 
 ### Notification system
 - [x] **In-app notification bell** in the topbar with unread count badge.
-- [x] **Notification dropdown** — lists recent notifications with read/unread state; marks all read on open.
+- [x] **Notification stream page** — clicking the bell navigates to a full `/notifications` stream page; marks all unread on open.
 - [x] **Admin notified** when a new swag order is placed.
 - [x] **Order owner notified** when an admin transitions their order to a new state.
 - [x] Notifications stored in TinyDB, retrieved per-user, with `read` flag.
+- [x] **Notification deep-link navigation** — clicking a notification routes to the relevant action (approval notifications → Admin panel Approvals tab).
+- [x] **Full notification stream page** — clicking the bell opens a dedicated notification stream page, not just a dropdown.
+- [x] **Seeded notifications** — seed data includes realistic pending notifications (3 per admin, 1 per regular user) so the stream is non-empty on first load.
 
 ---
 
@@ -113,6 +126,13 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - [x] **Profile tabs**: Kudos received · GitHub contributions · CRM contributions.
 - [x] **Company stats** (total kudos, points awarded, people recognized, CRM events).
 - [x] A **celebratory moment** on giving kudos (confetti) — reinforces the positive ritual.
+- [x] **Activity view** (`/activity` nav item) — combined feed of all GitHub and CRM contributions
+  across all users, filterable by source. Each card has an **Award kudos** button that pre-fills
+  the give-kudos modal with the contributor and artifact link.
+- [x] **Award kudos from CRM profile tab** — CRM contributions on user profiles now have an
+  "Award kudos" button (matching the existing GitHub tab behavior).
+- [x] **Admin panel theme consistency** — all admin tabs use a unified container style, section
+  group titles replace bare `<h3>` tags, Orders tab wrapped in a consistent card.
 
 ### GitHub integration
 - [x] Pull a user's **merged PRs** and **closed issues** via the GitHub Search API.
@@ -126,13 +146,24 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - [x] **Demo-login fallback** — pick any seeded employee; no GitHub app required.
 - [x] **Admin role** — can edit settings, manage workflow, manage swag catalog, approve orders.
 - [ ] ❓ How are **admins** designated in real use (config, first user, SSO group)?
+- [x] **Three-tier role system** — SuperAdmin, Admin, and User roles replace the current binary admin flag.
+- [x] **SuperAdmin privileges** — full access; can create and promote other SuperAdmins; all Admin capabilities included.
+- [x] **Admin privileges** — can approve swag orders and add/manage users; cannot promote to SuperAdmin or modify system settings.
+- [x] **User privileges** — can give kudos, redeem swag, and view all social features; no admin access.
+- [x] **Role management UI** — Admin screen lets SuperAdmins assign and change roles for any user.
 
 ### Non-functional / quality
 - [x] **Ease of use** — intuitive, minimal interface (judging criterion).
 - [x] **Maintainability** — small, documented modules; clear data layer; single codebase.
 - [x] **Runs out-of-the-box** — `pip install` + seed + run; no external DB/server to stand up.
 - [x] **Concurrency-safe** data access (module-level `threading.RLock` serializes all reads and writes).
-- [x] **Seed data** — 10 employees, 15 kudos, 12 GitHub contributions, 12 CRM events, 8 swag items.
+- [x] **Seed data** — 10 employees, 15 kudos, 13 GitHub contributions, 23 CRM events across 7 employees, 9 swag items.
+  Seed intentionally timestamps a subset of events to `days_ago(0)` so "This month" leaderboard is
+  never empty regardless of what day of the month the seed is run.
+- [x] **Test suite** — 183 pytest tests covering auth, kudos, feed, leaderboard, activity, swag,
+  workflow, CRM, GitHub, notifications, settings, and roles. Includes `TestSeedLeaderboard` (guards
+  against seed-timing regressions), `TestActivityFeed` (9 tests), and `TestRoleAPI` (role hierarchy
+  enforcement).
 - [ ] **README / setup docs** and a **demo script** for the shareout.
 - [ ] ❓ **Deployment** target — local-only for demo, or hosted somewhere?
 
@@ -181,21 +212,46 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 
 ```
 app/
-  main.py          — All FastAPI routes (auth, kudos, feed, GitHub, CRM, swag, workflow, notifications)
+  main.py          — All FastAPI routes (auth, kudos, feed, activity, GitHub, CRM, swag, workflow, notifications)
   db.py            — TinyDB repository layer (all reads + writes; thread-safe RLock)
   auth.py          — Session dependency; require_admin(); upsert_github_user()
   config.py        — Env vars; github_oauth_enabled() helper
   values.py        — 6 core values with colors
   crm_events.py    — 6 CRM event types, configurable weights, event_points()
+  github_sync.py   — GitHub Search API sync (merged PRs + closed issues); see architecture.md for details
   workflow.py      — Workflow state machine helpers (add/delete states & transitions)
   schemas.py       — Pydantic request body models
-  seed.py          — Wipe + reseed with 10 employees, 15 kudos, contributions, swag, orders
+  seed.py          — Wipe + reseed with 10 employees, 15 kudos, 13 GitHub + 23 CRM contributions, 9 swag items, swag orders
 
 static/
-  index.html       — HTML shell (login, topbar with notif bell + Rewards nav, give modal)
-  styles.css       — OpenTeams palette, Airbnb-minimal + swag/workflow/notification styles
-  app.js           — Vanilla JS SPA: feed, leaderboard, people, profile, rewards, admin
+  index.html             — HTML shell (login, topbar with 🎉 give button, give modal)
+  styles.css             — OpenTeams palette, Airbnb-minimal + swag/workflow/notification styles
+  app.js                 — Vanilla JS SPA: feed, leaderboard, people, profile, rewards, admin
+  openteams-logo.png     — OpenTeams horizontal logo (dark, for light backgrounds)
+  openteams-morale-logo.svg — Composite logo: OpenTeams PNG + "Morale" SVG text; used in topbar + login
 
 requirements.txt   — Python dependencies (fastapi, uvicorn, pydantic, httpx, tinydb)
 requirements.md    — This file
+
+tests/
+  conftest.py         — Shared fixtures (seeded_db, client, admin_client, user*_client, full_seed_client)
+  test_auth.py        — Auth / session tests
+  test_kudos.py       — Kudos creation, allowance, validation
+  test_feed.py        — Recognition feed ordering and reactions
+  test_leaderboard.py — Leaderboard period logic, accumulation toggle coverage, seed-timing guard
+  test_activity.py    — Activity feed (GitHub + CRM combined; auth, filters, sort, Award kudos data)
+  test_profile.py     — User profiles, contribution tabs
+  test_swag.py        — Swag catalog, orders, spendable balance
+  test_crm.py         — CRM webhook endpoint, event types, idempotency
+  test_workflow.py    — Workflow state machine, transitions, audit log
+  test_github.py      — GitHub accumulation toggle (TestGithubAccumulationToggle)
+  test_notifications.py — Order and transition notifications; notification endpoints
+  test_settings.py    — Settings read/write; admin-only enforcement; defaults validation
+  test_roles.py       — Three-tier role system (SuperAdmin/Admin/User); role field, API enforcement
+
+.claude/skills/
+  seed/SKILL.md          — How to wipe + reseed the database (Windows + Mac/Linux steps)
+  server/SKILL.md        — How to free port 8000 and restart uvicorn
+  test/SKILL.md          — How to run the full pytest suite with common flag options
+  requirements/SKILL.md  — Log new requirements from chat into docs/requirements.md in real time
 ```

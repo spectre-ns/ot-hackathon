@@ -56,10 +56,20 @@ def _with_id(doc) -> dict | None:
 
 
 # --- users --------------------------------------------------------------------
+ADMIN_ROLES = {"admin", "superadmin"}
+
+
+def _role_is_admin(role: str) -> bool:
+    return role in ADMIN_ROLES
+
+
 def create_user(**fields) -> dict:
     with _lock:
         fields.setdefault("created_at", utcnow_iso())
-        fields.setdefault("is_admin", False)
+        # Infer role from legacy is_admin if not explicitly provided
+        if "role" not in fields:
+            fields["role"] = "superadmin" if fields.get("is_admin") else "user"
+        fields["is_admin"] = _role_is_admin(fields["role"])
         fields.setdefault("avatar_color", "#4D75FE")
         fields.setdefault("avatar_url", "")
         fields.setdefault("title", "")
@@ -102,6 +112,14 @@ def update_user(uid: int, **fields) -> dict | None:
     with _lock:
         _table("users").update(fields, doc_ids=[uid])
     return get_user(uid)
+
+
+def set_user_role(uid: int, role: str) -> dict | None:
+    if role not in ("user", "admin", "superadmin"):
+        raise ValueError(f"Invalid role: {role!r}")
+    if not get_user(uid):
+        return None
+    return update_user(uid, role=role, is_admin=_role_is_admin(role))
 
 
 # --- kudos --------------------------------------------------------------------

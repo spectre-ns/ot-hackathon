@@ -31,14 +31,16 @@ All FastAPI routes. Organized into logical groups:
 | Users | `/api/users` | List, profile, give kudos, reactions |
 | Feed | `/api/feed` | Recognition feed (enriched kudos) |
 | Leaderboard | `/api/leaderboard` | Points ranked by period |
+| Activity | `/api/activity` | Combined GitHub + CRM feed across all users |
 | Stats | `/api/stats` | Company-wide aggregate stats |
-| GitHub | `/api/github` | Sync merged PRs + closed issues |
+| GitHub | `/api/github/sync` | Pull merged PRs + closed issues for current user |
 | CRM | `/api/crm` | Webhook ingestion, simulate, list event types |
 | Settings | `/api/settings` | Admin GET/PUT for all weights + toggles |
 | Swag | `/api/swag` | Catalog, order, order history |
 | Workflow | `/api/workflow` | Get/add/delete states + transitions |
 | Notifications | `/api/notifications` | List, mark-read |
-| Static | `/{path}` | Serve `static/` files |
+| Role management | `/api/users/{id}/role` | SuperAdmin-only role assignment |
+| SPA fallback | `/{path:path}` | Catch-all — serves `index.html` for all non-API paths (enables browser history navigation + deep-link refresh) |
 
 Key helper: `enrich_kudos(k)` — joins user objects + value metadata + reactions onto a raw kudos doc before returning to the frontend.
 
@@ -46,7 +48,7 @@ Key helper: `enrich_kudos(k)` — joins user objects + value metadata + reaction
 TinyDB repository. **Critical invariant:** every function acquires `_lock` (module-level `threading.RLock`) before touching the database. This prevents torn reads when FastAPI's threadpool runs concurrent requests.
 
 Tables:
-- `users` — employees; fields: id, name, email, title, department, avatar_color, github_login, is_admin
+- `users` — employees; fields: id, name, email, title, department, avatar_color, github_login, role (`"user"` | `"admin"` | `"superadmin"`), is_admin (derived from role)
 - `kudos` — giver_id, receiver_id, points, value_key, message, created_at, artifact_url, artifact_label
 - `reactions` — kudos_id, user_id, emoji
 - `github_contributions` — user_id, kind, repo, number, title, url, points, happened_at
@@ -65,7 +67,8 @@ Key computed values:
 
 ### `app/auth.py`
 - `current_user()` — FastAPI `Depends()`; reads `kudos_session` httponly cookie; 401 if missing
-- `require_admin()` — FastAPI `Depends()`; 403 if not admin
+- `require_admin()` — FastAPI `Depends()`; 403 if role is not `admin` or `superadmin`
+- `require_superadmin()` — FastAPI `Depends()`; 403 if role is not `superadmin`
 - `upsert_github_user(gh_profile)` — find-or-create user from GitHub OAuth profile
 
 ### `app/config.py`
@@ -83,6 +86,18 @@ Reads environment variables. Key settings:
 ### `app/crm_events.py`
 6 event types: `deal_closed`, `contract_renewed`, `escalation_resolved`, `nps_positive`, `ticket_resolved`, `customer_call`. Each has `settings_key` for admin-configurable weight. `event_points(event_key, settings)` resolves the current weight.
 
+### `app/github_sync.py`
+Fetches a user's GitHub activity via the GitHub Search API and stores it in TinyDB.
+
+Key design: GitHub contributions are stored for **informational display** and for pre-filling kudos artifact fields. Whether they count toward `earned_points` is controlled by the `github_accumulation_enabled` setting toggle — the sync always stores the configured point weight so toggling takes effect immediately without a re-sync.
+
+Auth precedence (in order):
+1. User's own OAuth token (captured at GitHub login)
+2. Server-wide `GITHUB_TOKEN` env var
+3. Unauthenticated (rate-limited to 60 req/h — sufficient for demo)
+
+`sync_user(user, oauth_token)` — searches for `author:<login> type:pr is:merged` and `author:<login> type:issue is:closed`, paginates up to 500 results each, and calls `db.upsert_contribution()` per item. Returns a summary dict with `prs_seen`, `prs_added`, `issues_seen`, `issues_added`.
+
 ### `app/workflow.py`
 Workflow state machine helpers:
 - `DEFAULT_WORKFLOW` — 5 states (pending, under_review, approved, shipped, rejected), 6 transitions
@@ -97,17 +112,18 @@ Pydantic v2 request bodies for all endpoints. Key models:
 - `KudosBody` — includes `artifact_url`, `artifact_label`
 - `SettingsBody` — all weights including `github_accumulation_enabled`, `crm_accumulation_enabled`
 - `CRMEventBody` — webhook payload; `user_identifier` can be github_login or email
+- `UserRoleBody` — `{role: "user"|"admin"|"superadmin"}` for role management endpoint
 - `SwagOrderBody`, `OrderTransitionBody`, `WorkflowStateBody`, `WorkflowTransitionBody`
 
 ### `app/seed.py`
 Wipes and reseeds the database. Run with `python -m app.seed`. Seeds:
-- 10 employees (2 admins: Ada Lovelace, Grace Hopper)
+- 10 employees: 2 superadmins (Ada Lovelace, Grace Hopper), 1 admin (Alan Turing), 7 users
 - 15 kudos (some with artifact URLs)
-- 12 GitHub contributions
-- 12 CRM contributions across 6 event types
-- 8 swag items (T-shirt 50pts … Headphones 500pts)
+- 13 GitHub contributions
+- 23 CRM contributions across all 6 event types and 7 employees
+- 9 swag items (T-shirt 50pts … Headphones 500pts)
 - 1 pending swag order (Guido van Rossum, T-shirt)
-- Admin notifications for the pending order
+- 3 admin notifications per superadmin (pending orders); 1 status notification per regular user
 
 ---
 
@@ -115,10 +131,12 @@ Wipes and reseeds the database. Run with `python -m app.seed`. Seeds:
 
 Single-page app. No framework, no build step. Entry: `static/index.html`.
 
-### `static/app.js`
-Routing: `go(route, arg)` dispatches to `ROUTES[route](view, arg)`. Routes: `feed`, `leaderboard`, `people`, `profile`, `rewards`, `admin`.
+**Branding:** The app displays as **OpenTeams Morale** — topbar shows `static/openteams-morale-logo.svg` (OpenTeams logo with "Morale" subtitle baked in as SVG text). The 🎉 Give Kudos button is icon-only in the topbar; the user's giving balance appears as a stat on their own profile page rather than in the topbar.
 
-Admin sub-tabs: `settings`, `crm`, `orders`, `workflow`, `catalog`.
+### `static/app.js`
+Routing: `go(route, arg, push=true)` dispatches to `ROUTES[route](view, arg)` and calls `history.pushState()`. A `popstate` listener handles browser back/forward. `urlToRoute(pathname)` and `routeToUrl(route, arg)` map between URL paths and route state. Routes: `feed`, `leaderboard`, `people`, `profile`, `activity`, `rewards`, `admin`, `notifications`.
+
+Admin sub-tabs: `settings`, `crm`, `orders`, `workflow`, `catalog`, `users` (superadmin only).
 
 Key patterns:
 - `api.get/post/put/delete` — thin fetch wrappers; throw on non-2xx
@@ -127,10 +145,15 @@ Key patterns:
 - `openGive(prefill)` — opens give-kudos modal; `prefill` can include receiverId + artifact fields
 - `openRedeemModal(itemId, name, cost)` — dynamic modal for placing a swag order
 - `renderWFDiagram(wf)` — SVG workflow diagram from state machine data
+- `showTransitionDialog(fromName, toName, onConfirm, onCancel)` — styled `.modal-overlay` / `.modal-card` dialog for creating a new workflow transition (label input + requires-reason toggle); replaces browser `prompt()`
+- `renderUserManagement(el, users)` — role assignment table for superadmins
+- `navigateTo(link)` — parses an internal link string (e.g. `/admin/orders`) and calls `go()`
 - `fireConfetti()` — canvas particle burst on kudos sent
 
 ### `static/styles.css`
 CSS custom properties for OpenTeams palette. Component namespaces: `.kudos-*`, `.lb-*`, `.swag-*`, `.wf-*`, `.notif-*`, `.contrib-*`.
+
+Notable fix: `.os-stepper` uses `padding: 3px 0 2px` instead of the default `overflow-y:auto` behavior that would clip the active step dot's `margin:-3px` expansion.
 
 ---
 

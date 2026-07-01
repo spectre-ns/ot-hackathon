@@ -141,3 +141,85 @@ class TestLeaderboard:
         # GitHub points should be included
         assert user2_entry is not None
         assert user2_entry["points"] >= 10
+
+    def test_leaderboard_month_excludes_crm_when_accumulation_off(
+            self, admin_client, user1_client, users, seeded_db):
+        """When crm_accumulation_enabled=False, CRM events don't count in month period."""
+        import app.db as adb
+        adb.update_settings(
+            pr_points=10, issue_points=5, monthly_allowance=100,
+            github_accumulation_enabled=False,
+            crm_accumulation_enabled=False,
+            crm_deal_closed_points=25, crm_contract_renewed_points=20,
+            crm_escalation_resolved_points=15, crm_nps_positive_points=10,
+            crm_ticket_resolved_points=8, crm_customer_call_points=5,
+        )
+        adb.upsert_crm_contribution(
+            user_id=users["user2"]["id"], event_type="deal_closed",
+            reference_id="OPP-CRMACC-OFF-1", title="Test Deal",
+            company="TestCo", deal_value=50000, points=25,
+            happened_at=adb.utcnow_iso(),
+        )
+        resp = user1_client.get("/api/leaderboard?period=month")
+        user2_entry = next(
+            (r for r in resp.json() if r["user"]["id"] == users["user2"]["id"]), None
+        )
+        # CRM points should NOT be counted; user2 has no kudos, so they're absent
+        assert user2_entry is None
+
+    def test_leaderboard_month_includes_crm_when_accumulation_on(
+            self, admin_client, user1_client, users, seeded_db):
+        """When crm_accumulation_enabled=True, CRM events count in month period."""
+        import app.db as adb
+        adb.update_settings(
+            pr_points=10, issue_points=5, monthly_allowance=100,
+            github_accumulation_enabled=False,
+            crm_accumulation_enabled=True,
+            crm_deal_closed_points=25, crm_contract_renewed_points=20,
+            crm_escalation_resolved_points=15, crm_nps_positive_points=10,
+            crm_ticket_resolved_points=8, crm_customer_call_points=5,
+        )
+        adb.upsert_crm_contribution(
+            user_id=users["user2"]["id"], event_type="deal_closed",
+            reference_id="OPP-CRMACC-ON-1", title="Test Deal",
+            company="TestCo", deal_value=50000, points=25,
+            happened_at=adb.utcnow_iso(),
+        )
+        resp = user1_client.get("/api/leaderboard?period=month")
+        user2_entry = next(
+            (r for r in resp.json() if r["user"]["id"] == users["user2"]["id"]), None
+        )
+        assert user2_entry is not None
+        assert user2_entry["points"] == 25
+
+
+class TestSeedLeaderboard:
+    """Verify that the production seed (app/seed.py) produces a non-empty
+    current-month leaderboard. This guards against seed data where all
+    timestamps fall in the previous month (e.g. running on the 1st of a
+    new month when every days_ago(n≥1) lands in the prior month).
+    """
+
+    def test_seed_month_leaderboard_not_empty(self, full_seed_client):
+        resp = full_seed_client.get("/api/leaderboard?period=month")
+        assert resp.status_code == 200
+        rows = resp.json()
+        assert len(rows) > 0, (
+            "Month leaderboard is empty after seeding — "
+            "seed data must include at least some events from the current month"
+        )
+
+    def test_seed_all_time_leaderboard_not_empty(self, full_seed_client):
+        resp = full_seed_client.get("/api/leaderboard?period=all")
+        assert resp.status_code == 200
+        rows = resp.json()
+        assert len(rows) > 0
+
+    def test_seed_activity_not_empty(self, full_seed_client):
+        resp = full_seed_client.get("/api/activity")
+        assert resp.status_code == 200
+        items = resp.json()
+        assert len(items) > 0, "Activity feed should not be empty after seeding"
+        sources = {i["source"] for i in items}
+        assert "github" in sources
+        assert "crm" in sources

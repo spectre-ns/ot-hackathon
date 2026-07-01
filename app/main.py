@@ -17,7 +17,7 @@ from .crm_events import CRM_EVENT_TYPES, CRM_EVENTS_BY_KEY, event_points
 from .schemas import (
     CRMEventBody, DemoLoginBody, DeleteTransitionBody, KudosBody,
     OrderTransitionBody, ReactBody, SettingsBody, SwagItemBody, SwagOrderBody,
-    WorkflowStateBody, WorkflowTransitionBody,
+    UserRoleBody, WorkflowStateBody, WorkflowTransitionBody,
 )
 from .values import CORE_VALUES, value_or_default
 
@@ -41,6 +41,8 @@ def public_user(u: dict) -> dict:
         "avatar_color": u.get("avatar_color", "#4D75FE"),
         "github_login": u.get("github_login"),
         "is_admin": u.get("is_admin", False),
+        "role": u.get("role", "user"),
+        "email": u.get("email", ""),
         "earned_points": db.earned_points(u["id"]),
     }
 
@@ -87,9 +89,10 @@ def earned_in_period(uid: int, period: str) -> int:
     for k in db.kudos_received(uid):
         if _in_current_month(k["created_at"]):
             total += k["points"]
-    for c in db.crm_contributions_for(uid):
-        if _in_current_month(c.get("happened_at", "")):
-            total += c["points"]
+    if settings.get("crm_accumulation_enabled", True):
+        for c in db.crm_contributions_for(uid):
+            if _in_current_month(c.get("happened_at", "")):
+                total += c["points"]
     if settings.get("github_accumulation_enabled", False):
         for c in db.contributions_for(uid):
             if _in_current_month(c.get("happened_at", "")):
@@ -213,6 +216,18 @@ def get_profile(user_id: int, viewer=Depends(auth.current_session)):
     }
 
 
+@app.put("/api/users/{user_id}/role")
+def update_user_role(user_id: int, body: UserRoleBody,
+                     superadmin=Depends(auth.require_superadmin)):
+    try:
+        updated = db.set_user_role(user_id, body.role)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if not updated:
+        raise HTTPException(404, "User not found")
+    return public_user(updated)
+
+
 # --------------------------------------------------------------------------
 # Feed / kudos
 # --------------------------------------------------------------------------
@@ -269,6 +284,24 @@ def leaderboard(period: str = "month"):
     for i, r in enumerate(rows):
         r["rank"] = i + 1
     return rows
+
+
+@app.get("/api/activity")
+def activity_feed(_user=Depends(auth.current_user), limit: int = 100):
+    """Combined GitHub + CRM contributions across all users, newest first."""
+    users_map = {u["id"]: u for u in db.all_users()}
+    items = []
+    for c in db.all_contributions():
+        u = users_map.get(c["user_id"])
+        items.append({**c, "source": "github", "user": public_user(u) if u else None})
+    for c in db.all_crm_contributions():
+        u = users_map.get(c["user_id"])
+        et = CRM_EVENTS_BY_KEY.get(c["event_type"], {})
+        items.append({**c, "source": "crm", "user": public_user(u) if u else None,
+                      "event_label": et.get("label", c["event_type"]),
+                      "event_emoji": et.get("emoji", "📋")})
+    items.sort(key=lambda x: x.get("happened_at", ""), reverse=True)
+    return items[:limit]
 
 
 @app.get("/api/stats")
@@ -607,3 +640,8 @@ def index():
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/{path:path}")
+def spa_fallback(path: str):
+    return FileResponse(STATIC_DIR / "index.html")

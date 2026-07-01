@@ -33,7 +33,7 @@ ADMIN1 = dict(
     department="Platform",
     avatar_color="#000F3A",
     github_login="ada-lovelace",
-    is_admin=True,
+    role="superadmin",
 )
 ADMIN2 = dict(
     name="Grace Hopper",
@@ -42,7 +42,16 @@ ADMIN2 = dict(
     department="Platform",
     avatar_color="#4D75FE",
     github_login="gracehopper",
-    is_admin=True,
+    role="superadmin",
+)
+ADMIN_BASIC = dict(
+    name="Margaret Hamilton",
+    email="margaret@test.com",
+    title="Engineer",
+    department="Platform",
+    avatar_color="#7C5CFF",
+    github_login="mhamilton",
+    role="admin",
 )
 USER1 = dict(
     name="Alan Turing",
@@ -51,7 +60,7 @@ USER1 = dict(
     department="Infrastructure",
     avatar_color="#2E9E6B",
     github_login="alanturing",
-    is_admin=False,
+    role="user",
 )
 USER2 = dict(
     name="Katherine Johnson",
@@ -60,7 +69,7 @@ USER2 = dict(
     department="Data",
     avatar_color="#FAA944",
     github_login="katherinej",
-    is_admin=False,
+    role="user",
 )
 USER3 = dict(
     name="Linus Torvalds",
@@ -69,7 +78,7 @@ USER3 = dict(
     department="Infrastructure",
     avatar_color="#FF8A69",
     github_login="torvalds",
-    is_admin=False,
+    role="user",
 )
 
 
@@ -99,22 +108,24 @@ def seeded_db(db_path, monkeypatch):
     adb._db = None
 
     # Seed
-    admin1 = adb.create_user(**ADMIN1)
-    admin2 = adb.create_user(**ADMIN2)
-    user1  = adb.create_user(**USER1)
-    user2  = adb.create_user(**USER2)
-    user3  = adb.create_user(**USER3)
+    admin1      = adb.create_user(**ADMIN1)
+    admin2      = adb.create_user(**ADMIN2)
+    admin_basic = adb.create_user(**ADMIN_BASIC)
+    user1       = adb.create_user(**USER1)
+    user2       = adb.create_user(**USER2)
+    user3       = adb.create_user(**USER3)
 
     # Ensure settings and workflow are initialized
     adb.get_settings()
     adb.get_workflow()
 
     yield {
-        "admin1": admin1,
-        "admin2": admin2,
-        "user1":  user1,
-        "user2":  user2,
-        "user3":  user3,
+        "admin1":      admin1,
+        "admin2":      admin2,
+        "admin_basic": admin_basic,
+        "user1":       user1,
+        "user2":       user2,
+        "user3":       user3,
     }
 
     # Teardown
@@ -172,6 +183,17 @@ def admin2_client(seeded_db):
 
 
 @pytest.fixture
+def admin_basic_client(seeded_db):
+    """TestClient authenticated as admin_basic (Alan Turing, role=admin)."""
+    from app.main import app
+    user = seeded_db["admin_basic"]
+    with TestClient(app, raise_server_exceptions=True) as c:
+        resp = c.post("/api/auth/demo", json={"user_id": user["id"]})
+        assert resp.status_code == 200
+        yield c
+
+
+@pytest.fixture
 def user1_client(seeded_db):
     """TestClient authenticated as user1 (Alan Turing)."""
     from app.main import app
@@ -191,3 +213,34 @@ def user2_client(seeded_db):
         resp = c.post("/api/auth/demo", json={"user_id": user["id"]})
         assert resp.status_code == 200
         yield c
+
+
+@pytest.fixture
+def full_seed_client(db_path, monkeypatch):
+    """TestClient backed by the REAL app seed (app/seed.py).
+
+    Runs seed.run() so tests can verify that production seed data
+    produces a correct application state (e.g. current-month leaderboard
+    is not empty after seeding).
+    """
+    import app.config as cfg
+    monkeypatch.setattr(cfg, "DATABASE_FILE", db_path)
+    import app.db as adb
+    monkeypatch.setattr(adb, "DATABASE_FILE", db_path)
+    adb._db = None
+
+    from app.seed import run as seed_run
+    seed_run()
+
+    from app.main import app
+    # Log in as Ada Lovelace (first user, always admin after seed)
+    with TestClient(app, raise_server_exceptions=True) as c:
+        users = adb.all_users()
+        ada = next(u for u in users if u["name"] == "Ada Lovelace")
+        resp = c.post("/api/auth/demo", json={"user_id": ada["id"]})
+        assert resp.status_code == 200
+        yield c
+
+    if adb._db is not None:
+        adb._db.close()
+    adb._db = None

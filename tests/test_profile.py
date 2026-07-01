@@ -99,7 +99,7 @@ class TestProfile:
         assert resp.status_code == 200
         user_list = resp.json()
         assert isinstance(user_list, list)
-        assert len(user_list) == 5  # 2 admins + 3 regular users seeded
+        assert len(user_list) == 6  # 2 superadmins + 1 admin + 3 regular users seeded
 
     def test_list_users_sorted_alphabetically(self, client):
         resp = client.get("/api/users")

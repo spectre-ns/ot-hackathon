@@ -73,6 +73,10 @@ class DeleteTransitionBody(BaseModel):
     transition_id: str
 
 
+class UserRoleBody(BaseModel):
+    role: str
+
+
 class CRMEventBody(BaseModel):
     """Webhook payload schema.
 

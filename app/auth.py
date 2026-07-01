@@ -121,3 +121,9 @@ def require_admin(user: dict = Depends(current_user)) -> dict:
     if not user.get("is_admin"):
         raise HTTPException(403, "Admin privileges required")
     return user
+
+
+def require_superadmin(user: dict = Depends(current_user)) -> dict:
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "SuperAdmin privileges required")
+    return user

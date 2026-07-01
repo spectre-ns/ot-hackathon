@@ -16,33 +16,33 @@ def days_ago(n: int) -> str:
 
 
 EMPLOYEES = [
-    # name, email, title, department, color, github_login, is_admin
-    ("Ada Lovelace",     "ada@openteams.com",      "Principal Engineer",    "Platform",        "#000F3A", "ada-lovelace", True),
-    ("Grace Hopper",     "grace@openteams.com",    "Engineering Manager",   "Platform",        "#4D75FE", "gracehopper",  True),
-    ("Alan Turing",      "alan@openteams.com",     "Staff Engineer",        "Infrastructure",  "#2E9E6B", "alanturing",   False),
-    ("Katherine Johnson","katherine@openteams.com","Senior Engineer",       "Data",            "#FAA944", "katherinej",   False),
-    ("Linus Torvalds",   "linus@openteams.com",    "Senior Engineer",       "Infrastructure",  "#FF8A69", "torvalds",     False),
-    ("Margaret Hamilton","margaret@openteams.com", "Engineer",              "Platform",        "#7C5CFF", "mhamilton",    False),
-    ("Dennis Ritchie",   "dennis@openteams.com",   "Engineer",              "Languages",       "#1F8A8A", "dmr",          False),
-    ("Barbara Liskov",   "barbara@openteams.com",  "Principal Engineer",    "Languages",       "#3a61e8", "bliskov",      False),
-    ("Guido van Rossum", "guido@openteams.com",    "Distinguished Engineer","Languages",       "#d6502f", "gvanrossum",   False),
-    ("Radia Perlman",    "radia@openteams.com",    "Network Architect",     "Infrastructure",  "#1c7a47", "rperlman",     False),
+    # name, email, title, department, color, github_login, role
+    ("Ada Lovelace",     "ada@openteams.com",      "Principal Engineer",    "Platform",        "#000F3A", "ada-lovelace", "superadmin"),
+    ("Grace Hopper",     "grace@openteams.com",    "Engineering Manager",   "Platform",        "#4D75FE", "gracehopper",  "superadmin"),
+    ("Alan Turing",      "alan@openteams.com",     "Staff Engineer",        "Infrastructure",  "#2E9E6B", "alanturing",   "admin"),
+    ("Katherine Johnson","katherine@openteams.com","Senior Engineer",       "Data",            "#FAA944", "katherinej",   "user"),
+    ("Linus Torvalds",   "linus@openteams.com",    "Senior Engineer",       "Infrastructure",  "#FF8A69", "torvalds",     "user"),
+    ("Margaret Hamilton","margaret@openteams.com", "Engineer",              "Platform",        "#7C5CFF", "mhamilton",    "user"),
+    ("Dennis Ritchie",   "dennis@openteams.com",   "Engineer",              "Languages",       "#1F8A8A", "dmr",          "user"),
+    ("Barbara Liskov",   "barbara@openteams.com",  "Principal Engineer",    "Languages",       "#3a61e8", "bliskov",      "user"),
+    ("Guido van Rossum", "guido@openteams.com",    "Distinguished Engineer","Languages",       "#d6502f", "gvanrossum",   "user"),
+    ("Radia Perlman",    "radia@openteams.com",    "Network Architect",     "Infrastructure",  "#1c7a47", "rperlman",     "user"),
 ]
 
 # (giver_idx, receiver_idx, points, value_key, message, days_ago, artifact_url, artifact_label)
 KUDOS = [
     (1, 2, 25, "crisis_crusher",
      "Jumped on the prod outage at 11pm and had us back online in 40 minutes. Absolute lifesaver. 🙏",
-     1, "", ""),
+     0, "", ""),
     (3, 0, 15, "great_teammate",
      "Always the first to answer a question in #engineering and never makes anyone feel dumb for asking.",
-     2, "", ""),
+     0, "", ""),
     (0, 5, 20, "above_beyond",
      "Rewrote the onboarding docs without being asked — every new hire this quarter has thanked us for it.",
-     3, "", ""),
+     0, "", ""),
     (4, 7, 30, "client_hero",
      "Handled the Northwind escalation with so much grace. The client literally asked to keep working with us BECAUSE of you.",
-     4, "", ""),
+     0, "", ""),
     (2, 8, 10, "mentor",
      "Spent an hour pairing with me on async patterns. I finally get it. Thank you!",
      5, "", ""),
@@ -82,12 +82,12 @@ KUDOS = [
 # off by default. Each has an artifact URL for traceability.
 # (user_idx, kind, repo, number, title, days_ago)
 GH_CONTRIBUTIONS = [
-    (0, "pr",    "openteams/platform",      1421, "Add connection pooling to the query layer",       2),
+    (0, "pr",    "openteams/platform",      1421, "Add connection pooling to the query layer",       0),
     (0, "pr",    "openteams/platform",      1402, "Fix race condition in session cache",              6),
     (0, "issue", "openteams/platform",      1390, "Investigate elevated 5xx rate on /search",         8),
-    (3, "pr",    "openteams/data-pipeline",  588, "Vectorized feature extraction (3x faster)",        3),
+    (3, "pr",    "openteams/data-pipeline",  588, "Vectorized feature extraction (3x faster)",        0),
     (3, "pr",    "openteams/data-pipeline",  571, "Backfill job idempotency",                        11),
-    (4, "pr",    "openteams/infra",          2304, "Harden network policy for prod namespace",        4),
+    (4, "pr",    "openteams/infra",          2304, "Harden network policy for prod namespace",        0),
     (4, "issue", "openteams/infra",          2298, "Network partition between az-1 and az-2",         9),
     (7, "pr",    "openteams/lang-tools",      142, "Type inference for generic protocols",            5),
     (8, "pr",    "openteams/lang-tools",      139, "Improve error messages for missing __init__",     7),
@@ -99,18 +99,36 @@ GH_CONTRIBUTIONS = [
 # CRM contributions
 # (user_idx, event_type, reference_id, title, company, deal_value, days_ago, artifact_url)
 CRM_CONTRIBUTIONS = [
-    (8, "deal_closed",        "OPP-8821",  "Closed Acme Corp Enterprise deal",          "Acme Corp",       85000,  2,  "https://crm.example.com/opportunities/OPP-8821"),
+    # Guido — sales
+    (8, "deal_closed",        "OPP-8821",  "Closed Acme Corp Enterprise deal",          "Acme Corp",       85000,  0,  "https://crm.example.com/opportunities/OPP-8821"),
     (8, "contract_renewed",   "REN-2204",  "Renewed TechCorp annual subscription",      "TechCorp",        42000,  5,  "https://crm.example.com/renewals/REN-2204"),
-    (1, "escalation_resolved","ESC-1103",  "Resolved BigClient API integration outage", "BigClient Inc",   None,   3,  "https://crm.example.com/cases/ESC-1103"),
+    (8, "customer_call",      "CALL-9920", "Executive QBR with Acme Corp",              "Acme Corp",       None,   0,  ""),
+    (8, "nps_positive",       "NPS-5610",  "NPS 10 from TechCorp",                      "TechCorp",        None,  18,  ""),
+    # Grace — escalations & NPS
+    (1, "escalation_resolved","ESC-1103",  "Resolved BigClient API integration outage", "BigClient Inc",   None,   0,  "https://crm.example.com/cases/ESC-1103"),
     (1, "nps_positive",       "NPS-5591",  "NPS 10 from CloudSystems",                  "CloudSystems",    None,   7,  ""),
-    (3, "ticket_resolved",    "CASE-4421", "Resolved data export timeout for FinCo",    "FinCo",           None,   1,  "https://crm.example.com/cases/CASE-4421"),
+    (1, "escalation_resolved","ESC-1098",  "Resolved PlatformCo data sync failure",     "PlatformCo",      None,  11,  "https://crm.example.com/cases/ESC-1098"),
+    # Katherine — support & calls
+    (3, "ticket_resolved",    "CASE-4421", "Resolved data export timeout for FinCo",    "FinCo",           None,   0,  "https://crm.example.com/cases/CASE-4421"),
     (3, "ticket_resolved",    "CASE-4398", "Resolved API rate limit issue for MedTech", "MedTech",         None,   6,  ""),
     (3, "ticket_resolved",    "CASE-4350", "Resolved SSO configuration for GovAgency",  "GovAgency",       None,  12,  ""),
     (3, "customer_call",      "CALL-9901", "Quarterly business review with DataCo",     "DataCo",          None,   4,  ""),
     (3, "customer_call",      "CALL-9877", "Onboarding call with NewClient",             "NewClient",       None,   9,  ""),
+    # Radia — NPS & demos
     (9, "nps_positive",       "NPS-5580",  "NPS 9 from NetWorks Corp",                  "NetWorks Corp",   None,  10,  ""),
     (9, "customer_call",      "CALL-9860", "Demo call with ProspectCo",                  "ProspectCo",      None,  14,  ""),
+    (9, "nps_positive",       "NPS-5602",  "NPS 10 from InfraCo",                       "InfraCo",         None,  19,  ""),
+    # Margaret — deals
     (5, "deal_closed",        "OPP-8790",  "Closed StartupXYZ seed deal",               "StartupXYZ",     12000,  8,  ""),
+    (5, "contract_renewed",   "REN-2218",  "Renewed DevCorp platform license",           "DevCorp",        28000, 16,  ""),
+    (5, "customer_call",      "CALL-9845", "Discovery call with HealthTech",             "HealthTech",      None,  21,  ""),
+    # Alan — technical escalations
+    (2, "escalation_resolved","ESC-1112",  "Resolved InfraCo outage during migration",  "InfraCo",         None,   5,  ""),
+    (2, "ticket_resolved",    "CASE-4440", "Fixed permissions issue for RetailCo",      "RetailCo",        None,  13,  ""),
+    # Linus — enterprise sales
+    (4, "deal_closed",        "OPP-8835",  "Closed LogiCo infrastructure contract",     "LogiCo",         55000,  3,  ""),
+    (4, "customer_call",      "CALL-9910", "Technical deep-dive with LogiCo architects","LogiCo",          None,   2,  ""),
+    (4, "nps_positive",       "NPS-5598",  "NPS 9 from RetailCo",                       "RetailCo",        None,  17,  ""),
 ]
 
 
@@ -150,10 +168,10 @@ def run():
     issue_pts = settings["issue_points"]
 
     users = []
-    for name, email, title, dept, color, gh, is_admin in EMPLOYEES:
+    for name, email, title, dept, color, gh, role in EMPLOYEES:
         users.append(db.create_user(
             name=name, email=email, title=title, department=dept,
-            avatar_color=color, github_login=gh, is_admin=is_admin,
+            avatar_color=color, github_login=gh, role=role,
         ))
 
     for gi, ri, pts, val, msg, ago, art_url, art_label in KUDOS:
@@ -210,11 +228,39 @@ def run():
                 f"🛍️ {guido['name']} placed a swag order: {item['name']} ({item['point_cost']} pts)",
                 kind="warning", link="/admin/orders")
 
+    # Seed additional notifications for a realistic stream.
+    margaret = users[5]   # Margaret Hamilton
+    katherine = users[3]  # Katherine Johnson
+    all_items = db.all_swag_items()
+    headphones = next(i for i in all_items if "Headphones" in i["name"])
+    pto = next(i for i in all_items if "PTO" in i["name"])
+
+    for u in users:
+        if u.get("is_admin"):
+            db.create_notification(
+                u["id"],
+                f"🛍️ {margaret['name']} placed a swag order: {pto['name']} ({pto['point_cost']} pts)",
+                kind="warning", link="/admin/orders")
+            db.create_notification(
+                u["id"],
+                f"🛍️ {katherine['name']} placed a swag order: {headphones['name']} ({headphones['point_cost']} pts)",
+                kind="warning", link="/admin/orders")
+
+    db.create_notification(
+        guido["id"],
+        f"Your order for {item['name']} moved to: Under Review",
+        kind="info", link="/rewards/orders")
+    db.create_notification(
+        margaret["id"],
+        f"Your order for {pto['name']} moved to: Under Review",
+        kind="info", link="/rewards/orders")
+
     print(f"Seeded {len(users)} employees, {len(KUDOS)} kudos, "
           f"{len(GH_CONTRIBUTIONS)} GitHub activities, "
           f"{len(CRM_CONTRIBUTIONS)} CRM events, "
           f"{len(SWAG_ITEMS)} swag items, 1 pending order.")
-    print("Admins:", ", ".join(u["name"] for u in users if u["is_admin"]))
+    print("SuperAdmins:", ", ".join(u["name"] for u in users if u.get("role") == "superadmin"))
+    print("Admins:", ", ".join(u["name"] for u in users if u.get("role") == "admin"))
 
 
 if __name__ == "__main__":

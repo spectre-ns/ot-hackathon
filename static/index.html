@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kudos · Recognize your teammates</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎉</text></svg>" />
+  <title>OpenTeams Morale · Recognize your teammates</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='16' fill='%23000F3A'/><text y='.82em' font-size='52' text-anchor='middle' x='50' fill='white' font-family='Arial,sans-serif' font-weight='bold'>OT</text></svg>" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
   <!-- Login screen -->
   <div id="login" class="login hidden">
     <div class="login-card">
-      <div class="login-brand"><span class="logo-mark">🎉</span><span>Kudos</span></div>
+      <div class="login-brand"><img src="/static/openteams-morale-logo.svg" alt="OpenTeams Morale" class="brand-logo" /></div>
       <h1>Recognize great work.</h1>
       <p class="login-sub">Give your teammates points for going above and beyond — being a great friend, taming a tough client, or saving the day in a crisis.</p>
       <a id="github-login-btn" class="btn btn-dark btn-block hidden" href="/auth/github/login">
@@ -34,25 +34,22 @@
   <div id="app" class="app hidden">
     <header class="topbar">
       <div class="topbar-left">
-        <a class="brand" data-route="feed"><span class="logo-mark">🎉</span> Kudos</a>
+        <a class="brand" data-route="feed"><img src="/static/openteams-morale-logo.svg" alt="OpenTeams Morale" class="brand-logo" /></a>
         <nav class="nav">
           <a class="nav-link" data-route="feed">Feed</a>
           <a class="nav-link" data-route="leaderboard">Leaderboard</a>
           <a class="nav-link" data-route="people">People</a>
+          <a class="nav-link" data-route="activity">Activity</a>
           <a class="nav-link" data-route="rewards">Rewards</a>
           <a class="nav-link admin-only hidden" data-route="admin">Admin</a>
         </nav>
       </div>
       <div class="topbar-right">
-        <div class="balance-pill" id="balance-pill" title="Points you have left to give this month">
-          <span class="balance-icon">🎁</span>
-          <span id="giving-balance">–</span><span class="balance-label">to give</span>
-        </div>
         <div class="notif-wrap">
           <button class="notif-btn" id="notif-btn" title="Notifications">🔔<span class="notif-badge hidden" id="notif-badge"></span></button>
           <div class="notif-dropdown hidden" id="notif-dropdown"></div>
         </div>
-        <button class="btn btn-primary btn-give" id="open-give">＋ Give Kudos</button>
+        <button class="btn btn-primary btn-give" id="open-give" aria-label="Give Kudos">🎉</button>
         <div class="avatar-menu">
           <button class="avatar-btn" id="avatar-btn"></button>
           <div class="menu hidden" id="user-menu">
@@ -103,7 +100,7 @@
         </details>
         <div class="modal-foot">
           <span class="form-error" id="give-error"></span>
-          <button type="submit" class="btn btn-primary" id="give-submit">Send Kudos 🎉</button>
+          <button type="submit" class="btn btn-primary" id="give-submit">Send Kudos</button>
         </div>
       </form>
     </div>
