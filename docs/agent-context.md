@@ -20,7 +20,7 @@ and CRM events. Points are redeemable in a swag catalog with a configurable appr
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Backend | Python 3.13 + FastAPI | Use miniconda Python, not system Python |
+| Backend | Python 3.14 + FastAPI | Use miniconda Python, not system Python |
 | DB | TinyDB (`kudos_db.json`) | No external server; single-file JSON |
 | Thread safety | `threading.RLock()` in `app/db.py` | ALL reads AND writes go through it |
 | Frontend | Vanilla JS/HTML/CSS | No React, no build step |

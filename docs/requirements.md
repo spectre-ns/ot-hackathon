@@ -198,7 +198,7 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 
 ## 6. Tech stack (as built)
 
-- **Backend:** Python 3.13 + FastAPI; Uvicorn server.
+- **Backend:** Python 3.14 + FastAPI; Uvicorn server.
 - **Data:** TinyDB (JSON document store) — single `kudos_db.json` file; tables: users, kudos,
   reactions, github_contributions, crm_contributions, settings, sessions, swag_items, swag_orders,
   workflow, notifications.
@@ -208,7 +208,7 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - **CRM:** Webhook endpoint + 6 event types + admin simulator; Salesforce adapter pattern documented.
 - **Workflow:** JIRA-inspired state machine stored in TinyDB; full transition audit log per order.
 - **Frontend:** Vanilla HTML/CSS/JS SPA (no build step), OpenTeams palette, Airbnb-minimal styling.
-- **venv:** `~/miniconda3/bin/python -m venv .venv` (requires Python 3.13 from Miniconda, not system Python).
+- **venv:** `~/miniconda3/bin/python -m venv .venv` (requires Python 3.14 from Miniconda, not system Python).
 
 ---
 

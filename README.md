@@ -4,7 +4,7 @@ A peer recognition and rewards platform built for the **OpenTeams "Bounty Hunter
 
 Design is intentionally minimal (Airbnb-style whitespace and cards) using the OpenTeams brand palette, and the whole thing runs out-of-the-box with no external database or services to stand up.
 
-![Python](https://img.shields.io/badge/python-3.13-blue) ![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688) ![TinyDB](https://img.shields.io/badge/database-TinyDB-lightgrey)
+![Python](https://img.shields.io/badge/python-3.14-blue) ![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688) ![TinyDB](https://img.shields.io/badge/database-TinyDB-lightgrey)
 
 ---
 
@@ -26,7 +26,7 @@ Design is intentionally minimal (Airbnb-style whitespace and cards) using the Op
 
 | Layer | Choice |
 |---|---|
-| Backend | Python 3.13, [FastAPI](https://fastapi.tiangolo.com/), Uvicorn |
+| Backend | Python 3.14, [FastAPI](https://fastapi.tiangolo.com/), Uvicorn |
 | Database | [TinyDB](https://tinydb.readthedocs.io/) — a single embedded JSON file (`kudos_db.json`), no external DB server |
 | Concurrency | A module-level `threading.RLock` serializes all reads/writes |
 | Auth | GitHub OAuth (optional) + a password-free demo login; httponly cookie sessions |
@@ -37,7 +37,7 @@ Design is intentionally minimal (Airbnb-style whitespace and cards) using the Op
 
 ### Prerequisites
 
-- Python 3.13 (a Miniconda install is recommended if your system Python is older)
+- Python 3.14 (a Miniconda install is recommended if your system Python is older)
 
 ### Setup
 

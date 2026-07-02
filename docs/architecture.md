@@ -8,7 +8,7 @@
 ## High-level structure
 
 ```
-FastAPI (Python 3.13)
+FastAPI (Python 3.14)
     └── Uvicorn (ASGI server)
          └── TinyDB (kudos_db.json — single-file NoSQL)
               └── threading.RLock (all reads + writes serialized)
