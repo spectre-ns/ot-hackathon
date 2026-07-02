@@ -14,7 +14,8 @@ Design is intentionally minimal (Airbnb-style whitespace and cards) using the Op
 - **Three balances per person** — a monthly *giving allowance* (what you can hand out), *earned points* (what you've accumulated), and *spendable points* (earned minus points tied up in swag orders).
 - **GitHub integration** — OAuth login, automatic points for merged PRs and closed issues via the GitHub Search API, admin-configurable weights, and an accumulation toggle so contributions can be tracked informationally without awarding points.
 - **CRM integration** — a webhook endpoint (`POST /api/crm/event`, secured by an `X-CRM-Key` header) that any CRM can call, six built-in event types (deal closed, contract renewed, escalation resolved, positive NPS, ticket resolved, customer call) with admin-configurable weights, idempotent on `reference_id`, plus an in-app simulator for demos. A Salesforce Flow/Apex adapter path is documented in code.
-- **Recognition feed, leaderboard, and people directory** — reverse-chronological feed with emoji reactions, this-month/all-time leaderboards, and individual profiles with kudos/GitHub/CRM history tabs.
+- **Recognition feed and people directory** — reverse-chronological feed with emoji reactions and individual profiles with kudos/GitHub/CRM history tabs.
+- **Admin statistics dashboard** — org-wide totals, points-by-source breakdown, top earners, and recognition/role/order breakdowns, visible to Admins and SuperAdmins only (no public leaderboard, to avoid gaming the recognition system).
 - **Activity feed** — a combined, filterable stream of everyone's GitHub and CRM contributions, with an "Award kudos" button that pre-fills the give-kudos modal.
 - **Swag catalog & redemption** — admin-managed catalog with point costs, optional stock limits, image thumbnails, and inline editing.
 - **Configurable, JIRA-inspired workflow engine** — orders move through an editable state machine (default: Pending → Under Review → Approved → Shipped, or Rejected). Admins can add/remove states and transitions via an interactive visual diagram editor, and every transition is written to a full audit log.
@@ -31,7 +32,7 @@ Design is intentionally minimal (Airbnb-style whitespace and cards) using the Op
 | Concurrency | A module-level `threading.RLock` serializes all reads/writes |
 | Auth | GitHub OAuth (optional) + a password-free demo login; httponly cookie sessions |
 | Frontend | Vanilla HTML/CSS/JS single-page app — no framework, no build step |
-| Tests | pytest, 180+ tests across auth, kudos, feed, leaderboard, activity, swag, workflow, CRM, GitHub, notifications, settings, and roles |
+| Tests | pytest, 180+ tests across auth, kudos, feed, statistics, activity, swag, workflow, CRM, GitHub, notifications, settings, and roles |
 
 ## Getting started
 
@@ -110,7 +111,7 @@ The CRM webhook key and all GitHub/CRM point weights are configured at runtime f
 
 ```
 app/
-  main.py          FastAPI routes: auth, kudos, feed, leaderboard, activity,
+  main.py          FastAPI routes: auth, kudos, feed, activity, admin statistics,
                     GitHub sync, CRM webhook, settings, swag, workflow, notifications
   db.py             TinyDB repository layer — every read/write goes through here
   auth.py           Session dependency, require_admin()/require_superadmin(), GitHub user upsert

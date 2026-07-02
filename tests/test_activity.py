@@ -138,3 +138,18 @@ class TestActivityFeed:
         assert "id" in item["user"]
         # GitHub items carry url for the artifact link
         assert "url" in item
+
+
+class TestSeedActivity:
+    """Verify that the production seed (app/seed.py) produces a non-empty
+    activity feed mixing both GitHub and CRM sources.
+    """
+
+    def test_seed_activity_not_empty(self, full_seed_client):
+        resp = full_seed_client.get("/api/activity")
+        assert resp.status_code == 200
+        items = resp.json()
+        assert len(items) > 0, "Activity feed should not be empty after seeding"
+        sources = {i["source"] for i in items}
+        assert "github" in sources
+        assert "crm" in sources

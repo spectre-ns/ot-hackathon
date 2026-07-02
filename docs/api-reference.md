@@ -105,17 +105,27 @@ Body: `{"emoji": "🎉"}`. Toggles reaction for current user.
 
 ---
 
-## Leaderboard / Stats
-
-### `GET /api/leaderboard?period=<month|all>`
-Returns array sorted by points descending:
-```json
-[{"rank": 1, "user": {...}, "points": 285}]
-```
+## Stats
 
 ### `GET /api/stats`
 ```json
 {"kudos_count": 15, "points_awarded": 280, "people_recognized": 8, "crm_events": 12}
+```
+
+### `GET /api/admin/statistics`
+Admin/SuperAdmin only (`require_admin`) — the public leaderboard was removed to avoid
+incentivizing competition or gaming the recognition system; this replaces it as an
+admin-only view.
+```json
+{
+  "kudos_count": 15, "kudos_points": 210, "crm_events": 12, "crm_points": 90,
+  "github_activities": 12, "github_points": 60, "points_awarded": 300,
+  "people_recognized": 8, "total_users": 10,
+  "role_counts": {"user": 8, "admin": 1, "superadmin": 1},
+  "value_breakdown": [{"value": {...}, "count": 5}],
+  "top_earners": [{"rank": 1, "user": {...}, "points": 285}],
+  "swag_orders_by_status": {"pending": 2, "approved": 1}
+}
 ```
 
 ---

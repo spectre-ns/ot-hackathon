@@ -220,8 +220,8 @@ def full_seed_client(db_path, monkeypatch):
     """TestClient backed by the REAL app seed (app/seed.py).
 
     Runs seed.run() so tests can verify that production seed data
-    produces a correct application state (e.g. current-month leaderboard
-    is not empty after seeding).
+    produces a correct application state (e.g. the activity feed and
+    admin statistics dashboard are populated after seeding).
     """
     import app.config as cfg
     monkeypatch.setattr(cfg, "DATABASE_FILE", db_path)

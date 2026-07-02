@@ -41,7 +41,7 @@ Pick the best-fit section and sub-section from the table below:
 | workflow, state machine, transition, approval | §2 Configurable workflow manager |
 | notification, bell, badge, read | §2 Notification system |
 | points model, allowance, budget, balance | §3 Recognition & points model |
-| feed, leaderboard, profile, reaction, confetti | §3 Social / engagement |
+| feed, statistics dashboard, profile, reaction, confetti | §3 Social / engagement |
 | auth, role, session, admin | §3 Auth, roles, sessions |
 | performance, test, deploy, setup, maintainability | §3 Non-functional / quality |
 | out of scope, not building, skip | §4 Out of scope |
@@ -91,8 +91,8 @@ For each `[ ]` (planned, not yet built) requirement just added, identify what te
 
 Check `tests/` for relevant existing test files:
 ```
-tests/test_auth.py, test_kudos.py, test_feed.py, test_leaderboard.py,
-test_activity.py, test_profile.py, test_swag.py, test_admin.py,
+tests/test_auth.py, test_kudos.py, test_feed.py, test_statistics.py,
+test_activity.py, test_profile.py, test_swag.py,
 test_crm.py, test_workflow.py, test_github.py, test_notifications.py,
 test_settings.py, test_roles.py
 ```

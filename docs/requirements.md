@@ -121,7 +121,10 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 ### Social / engagement
 - [x] **Recognition feed** — public, reverse-chronological wall of kudos.
 - [x] **Emoji reactions** on kudos (toggle on/off, one per emoji per person).
-- [x] **Leaderboard** — top earners, with **This month** and **All time** views.
+- [x] **Admin statistics dashboard** — replaces the public leaderboard; only Admins/SuperAdmins can
+  view org-wide totals, points-by-source breakdown, top earners (all-time), recognition by core
+  value, users by role, and swag orders by status, via `GET /api/admin/statistics` (Admin panel →
+  Statistics tab).
 - [x] **People directory** and **individual profiles** (points, value breakdown, history).
 - [x] **Profile tabs**: Kudos received · GitHub contributions · CRM contributions.
 - [x] **Company stats** (total kudos, points awarded, people recognized, CRM events).
@@ -160,9 +163,10 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - [x] **Seed data** — 10 employees, 15 kudos, 13 GitHub contributions, 23 CRM events across 7 employees, 9 swag items.
   Seed intentionally timestamps a subset of events to `days_ago(0)` so "This month" leaderboard is
   never empty regardless of what day of the month the seed is run.
-- [x] **Test suite** — 183 pytest tests covering auth, kudos, feed, leaderboard, activity, swag,
-  workflow, CRM, GitHub, notifications, settings, and roles. Includes `TestSeedLeaderboard` (guards
-  against seed-timing regressions), `TestActivityFeed` (9 tests), and `TestRoleAPI` (role hierarchy
+- [x] **Test suite** — 182 pytest tests covering auth, kudos, feed, statistics, activity, swag,
+  workflow, CRM, GitHub, notifications, settings, and roles. Includes `TestSeedActivity` (guards
+  against seed-timing regressions), `TestActivityFeed` (9 tests), `TestStatisticsAccess`/
+  `TestStatisticsData` (admin-only dashboard, access control), and `TestRoleAPI` (role hierarchy
   enforcement).
 - [ ] **README / setup docs** and a **demo script** for the shareout.
 - [ ] ❓ **Deployment** target — local-only for demo, or hosted somewhere?
@@ -180,6 +184,8 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - ⛔ Production-grade **auth hardening**, multi-tenant, audit logging.
 - ⛔ Migration to a **server-based DB** (Postgres/Mongo) — TinyDB sufficient for hackathon.
 - ⛔ Swag **physical fulfilment** or gift-card issuing — workflow stops at "Shipped" state.
+- ⛔ **Public leaderboard / peer ranking** — removed to avoid incentivizing competition or gaming
+  the recognition system; ranking data is now visible to Admins/SuperAdmins only.
 
 ---
 
@@ -230,7 +236,7 @@ app/
 static/
   index.html             — HTML shell (login, topbar, floating 🎉 give button, give modal)
   styles.css             — OpenTeams palette, Airbnb-minimal + swag/workflow/notification styles
-  app.js                 — Vanilla JS SPA: feed, leaderboard, people, profile, rewards, admin
+  app.js                 — Vanilla JS SPA: feed, people, profile, rewards, admin (incl. Statistics tab)
   openteams-logo.png     — OpenTeams horizontal logo (dark, for light backgrounds)
   openteams-morale-logo.svg — Composite logo: OpenTeams PNG + "Kudos" SVG text; used in topbar + login
 
@@ -242,8 +248,9 @@ tests/
   test_auth.py        — Auth / session tests
   test_kudos.py       — Kudos creation, allowance, validation
   test_feed.py        — Recognition feed ordering and reactions
-  test_leaderboard.py — Leaderboard period logic, accumulation toggle coverage, seed-timing guard
-  test_activity.py    — Activity feed (GitHub + CRM combined; auth, filters, sort, Award kudos data)
+  test_statistics.py  — Admin-only statistics dashboard: access control, data aggregation
+  test_activity.py    — Activity feed (GitHub + CRM combined; auth, filters, sort, Award kudos data;
+                         includes TestSeedActivity, the seed-timing guard formerly in test_leaderboard.py)
   test_profile.py     — User profiles, contribution tabs
   test_swag.py        — Swag catalog, orders, spendable balance
   test_crm.py         — CRM webhook endpoint, event types, idempotency

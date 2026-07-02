@@ -30,9 +30,9 @@ All FastAPI routes. Organized into logical groups:
 | Me / config | `/api/me`, `/api/config` | Current user + app config |
 | Users | `/api/users` | List, profile, give kudos, reactions |
 | Feed | `/api/feed` | Recognition feed (enriched kudos) |
-| Leaderboard | `/api/leaderboard` | Points ranked by period |
 | Activity | `/api/activity` | Combined GitHub + CRM feed across all users |
 | Stats | `/api/stats` | Company-wide aggregate stats |
+| Admin statistics | `/api/admin/statistics` | Admin/SuperAdmin-only dashboard: totals, points by source, top earners, value/role/order breakdowns |
 | GitHub | `/api/github/sync` | Pull merged PRs + closed issues for current user |
 | CRM | `/api/crm` | Webhook ingestion, simulate, list event types |
 | Settings | `/api/settings` | Admin GET/PUT for all weights + toggles |
@@ -134,7 +134,7 @@ Single-page app. No framework, no build step. Entry: `static/index.html`.
 **Branding:** The app displays as **OpenTeams Kudos** — topbar shows `static/openteams-morale-logo.svg` (OpenTeams logo with "Kudos" subtitle baked in as SVG text). The 🎉 Give Kudos button floats as a fixed circular button in the bottom-right corner of the viewport; the user's giving balance appears as a stat on their own profile page rather than in the topbar.
 
 ### `static/app.js`
-Routing: `go(route, arg, push=true)` dispatches to `ROUTES[route](view, arg)` and calls `history.pushState()`. A `popstate` listener handles browser back/forward. `urlToRoute(pathname)` and `routeToUrl(route, arg)` map between URL paths and route state. Routes: `feed`, `leaderboard`, `people`, `profile`, `activity`, `rewards`, `admin`, `notifications`.
+Routing: `go(route, arg, push=true)` dispatches to `ROUTES[route](view, arg)` and calls `history.pushState()`. A `popstate` listener handles browser back/forward. `urlToRoute(pathname)` and `routeToUrl(route, arg)` map between URL paths and route state. Routes: `feed`, `people`, `profile`, `activity`, `rewards`, `admin`, `notifications`. The Admin route (`admin`) is itself tabbed, with sub-routes passed as the route arg (e.g. `admin/statistics`, `admin/settings`, `admin/users`); there is no public leaderboard route or nav link — org-wide rankings are admin-only, surfaced in the Admin → Statistics tab, to avoid incentivizing gaming of the recognition system.
 
 Admin sub-tabs: `settings`, `crm`, `orders`, `workflow`, `catalog`, `users` (superadmin only).
 

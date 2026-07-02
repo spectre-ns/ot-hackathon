@@ -272,24 +272,8 @@ def react(kudos_id: int, body: ReactBody, user: dict = Depends(auth.current_user
 
 
 # --------------------------------------------------------------------------
-# Leaderboard / stats
+# Stats
 # --------------------------------------------------------------------------
-@app.get("/api/leaderboard")
-def leaderboard(period: str = "month"):
-    if period not in ("month", "all"):
-        period = "month"
-    rows = []
-    for u in db.all_users():
-        pts = earned_in_period(u["id"], period)
-        if pts <= 0:
-            continue
-        rows.append({"user": public_user(u), "points": pts})
-    rows.sort(key=lambda r: -r["points"])
-    for i, r in enumerate(rows):
-        r["rank"] = i + 1
-    return rows
-
-
 @app.get("/api/activity")
 def activity_feed(_user=Depends(auth.current_user), limit: int = 100):
     """Combined GitHub + CRM contributions across all users, newest first."""
@@ -325,6 +309,60 @@ def stats():
         "crm_events": len(crm_c),
         "github_activities": len(db.all_contributions()),
         "top_value": value_or_default(top_value) if top_value else None,
+    }
+
+
+@app.get("/api/admin/statistics")
+def admin_statistics(admin=Depends(auth.require_admin)):
+    """Org-wide statistics dashboard. Admin/SuperAdmin only — no public ranking."""
+    all_k = db.all_kudos()
+    crm_c = db.all_crm_contributions()
+    gh_c = db.all_contributions()
+    users = db.all_users()
+
+    kudos_points = sum(k["points"] for k in all_k)
+    crm_points = sum(c["points"] for c in crm_c)
+    gh_points = sum(c["points"] for c in gh_c)
+
+    value_tally: dict[str, int] = defaultdict(int)
+    for k in all_k:
+        value_tally[k["value_key"]] += 1
+    value_breakdown = [
+        {"value": value_or_default(key), "count": count}
+        for key, count in sorted(value_tally.items(), key=lambda x: -x[1])
+    ]
+
+    earners = []
+    for u in users:
+        pts = earned_in_period(u["id"], "all")
+        if pts > 0:
+            earners.append({"user": public_user(u), "points": pts})
+    earners.sort(key=lambda r: -r["points"])
+    for i, r in enumerate(earners):
+        r["rank"] = i + 1
+
+    role_counts: dict[str, int] = defaultdict(int)
+    for u in users:
+        role_counts[u.get("role", "user")] += 1
+
+    order_counts: dict[str, int] = defaultdict(int)
+    for o in db.all_swag_orders():
+        order_counts[o.get("status", "pending")] += 1
+
+    return {
+        "kudos_count": len(all_k),
+        "kudos_points": kudos_points,
+        "crm_events": len(crm_c),
+        "crm_points": crm_points,
+        "github_activities": len(gh_c),
+        "github_points": gh_points,
+        "points_awarded": kudos_points + crm_points,
+        "people_recognized": len({k["receiver_id"] for k in all_k}),
+        "total_users": len(users),
+        "role_counts": dict(role_counts),
+        "value_breakdown": value_breakdown,
+        "top_earners": earners[:10],
+        "swag_orders_by_status": dict(order_counts),
     }
 
 

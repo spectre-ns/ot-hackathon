@@ -29,11 +29,10 @@ go(route, arg)   // renders a view into #view
 Routes are registered in the `ROUTES` object:
 ```js
 ROUTES.feed = async (view, arg) => { ... }
-ROUTES.leaderboard = async (view, arg) => { ... }
 ROUTES.people = async (view, arg) => { ... }
 ROUTES.profile = async (view, userId) => { ... }
 ROUTES.rewards = async (view, tab) => { ... }   // tab: "catalog" | "orders"
-ROUTES.admin = async (view, subTab) => { ... }   // subTab: "settings" | "crm" | "orders" | "workflow" | "catalog"
+ROUTES.admin = async (view, subTab) => { ... }   // subTab: "statistics" | "settings" | "crm" | "orders" | "workflow" | "catalog" | "users"
 ```
 
 Nav links use `data-route="<name>"` attributes — a single delegated click handler on `document` calls `go()`.

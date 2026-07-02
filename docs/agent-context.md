@@ -133,9 +133,9 @@ docs/requirements.md — Human-editable requirements (keep updated per standing 
 
 ### "Verify the app works end-to-end"
 Read `docs/agent-context.md` + `docs/architecture.md`. Start server, run `python -m app.seed`,
-then use Playwright (`channel="chrome"`) to screenshot: login, feed, leaderboard, people,
-a profile (with CRM + GitHub tabs), rewards/catalog, rewards/orders, admin settings,
-admin CRM simulator, admin approvals, admin workflow editor.
+then use Playwright (`channel="chrome"`) to screenshot: login, feed, people,
+a profile (with CRM + GitHub tabs), rewards/catalog, rewards/orders, admin statistics,
+admin settings, admin CRM simulator, admin approvals, admin workflow editor.
 
 ### "Add a new API endpoint"
 Read `app/main.py` + `app/db.py` + `app/schemas.py`. Add the Pydantic schema to `schemas.py`,

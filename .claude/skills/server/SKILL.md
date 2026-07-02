@@ -1,5 +1,5 @@
 ---
-description: Kill any process on port 8000 and start the Kudos dev server (uvicorn). Use after code changes, after seeding, or when the Activity/Leaderboard page returns "Not Found".
+description: Kill any process on port 8000 and start the Kudos dev server (uvicorn). Use after code changes, after seeding, or when the Activity page or Admin Statistics tab returns "Not Found".
 ---
 
 # server
@@ -46,7 +46,7 @@ curl -s http://localhost:8000/api/config | python -c "import sys,json; print('OK
 
 Expected: `OK: 100`
 
-## When "Not Found" on Activity or Leaderboard
+## When "Not Found" on Activity or Admin Statistics
 
 This always means the server process is stale — it predates a code change that added the route. Kill + restart is the fix. No DB changes needed unless you also want fresh seed data (invoke `/seed` first).
 

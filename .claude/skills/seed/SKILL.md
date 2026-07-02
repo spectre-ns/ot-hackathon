@@ -24,6 +24,6 @@ Re-seeds the database. Use whenever the DB is stale, corrupt, or after schema-le
 
 ## Notes
 
-- The seed intentionally includes items timestamped to `days_ago(0)` (today) so the Leaderboard "This month" tab is never empty right after seeding.
+- The seed intentionally includes items timestamped to `days_ago(0)` (today) so the Activity feed and Admin → Statistics dashboard are never empty right after seeding.
 - Default logins after seed: any of the 10 employees via the demo-login picker. Ada Lovelace and Grace Hopper are admins.
 - The seed is idempotent in effect — running it twice is safe, it just resets again.

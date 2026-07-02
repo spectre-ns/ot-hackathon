@@ -225,31 +225,6 @@ async function sendReaction(kudosId, emoji) {
   catch(e) { toast(e.message, "error"); }
 }
 
-// ---- Leaderboard ----
-ROUTES.leaderboard = async (view, arg) => {
-  const period = arg || "month";
-  const rows = await api.get(`/api/leaderboard?period=${period}`);
-  const medals = {1:"🥇",2:"🥈",3:"🥉"};
-  view.innerHTML = `
-    <div class="page-head"><h2>Leaderboard</h2>
-      <div class="seg">
-        <button class="${period==="month"?"active":""}" data-period="month">This month</button>
-        <button class="${period==="all"?"active":""}" data-period="all">All time</button>
-      </div>
-    </div>
-    <div class="card">
-      ${rows.map(r => `
-        <div class="lb-row" data-profile="${r.user.id}">
-          <div class="lb-rank ${r.rank<=3?"top":""}">${medals[r.rank]||r.rank}</div>
-          ${avatarHTML(r.user,38)}
-          <div class="lb-name">${esc(r.user.name)}<div class="lb-sub">${esc(r.user.title||"")}${r.user.department?" · "+esc(r.user.department):""}</div></div>
-          <div class="lb-pts">${r.points} pts</div>
-        </div>`).join("") || empty("🏆","No points awarded in this period yet.")}
-    </div>`;
-  view.querySelectorAll("[data-period]").forEach(b => b.addEventListener("click", () => go("leaderboard", b.dataset.period)));
-  wireProfileLinks(view);
-};
-
 // ---- People ----
 ROUTES.people = async (view) => {
   const users = await api.get("/api/users");
@@ -553,9 +528,10 @@ function orderCard(o, wfStates) {
 // ---- Admin ----
 ROUTES.admin = async (view, arg) => {
   if (!state.me.is_admin) { view.innerHTML = empty("🔒","Admins only."); return; }
-  const subTab = arg || "settings";
+  const subTab = arg || "statistics";
   const isSuperAdmin = state.me.role === "superadmin";
-  const [settings, pendingOrders, allOrders, wf, allUsers] = await Promise.all([
+  const [stats, settings, pendingOrders, allOrders, wf, allUsers] = await Promise.all([
+    api.get("/api/admin/statistics"),
     api.get("/api/settings"),
     api.get("/api/swag/orders/pending"),
     api.get("/api/swag/orders/all"),
@@ -566,6 +542,7 @@ ROUTES.admin = async (view, arg) => {
   view.innerHTML = `
     <div class="page-head"><h2>Admin</h2></div>
     <div class="tabs">
+      <div class="tab ${subTab==="statistics"?"active":""}" data-atab="statistics">Statistics</div>
       <div class="tab ${subTab==="settings"?"active":""}" data-atab="settings">Settings</div>
       <div class="tab ${subTab==="crm"?"active":""}" data-atab="crm">CRM Simulator</div>
       <div class="tab ${subTab==="orders"?"active":""}" data-atab="orders">Approvals${pendingLabel}</div>
@@ -573,6 +550,7 @@ ROUTES.admin = async (view, arg) => {
       <div class="tab ${subTab==="catalog"?"active":""}" data-atab="catalog">Swag Catalog</div>
       ${isSuperAdmin ? `<div class="tab ${subTab==="users"?"active":""}" data-atab="users">Users</div>` : ""}
     </div>
+    <div id="atab-statistics" class="${subTab!=="statistics"?"hidden":""}"></div>
     <div id="atab-settings" class="${subTab!=="settings"?"hidden":""}"></div>
     <div id="atab-crm" class="${subTab!=="crm"?"hidden":""}"></div>
     <div id="atab-orders" class="${subTab!=="orders"?"hidden":""}"></div>
@@ -580,6 +558,7 @@ ROUTES.admin = async (view, arg) => {
     <div id="atab-catalog" class="${subTab!=="catalog"?"hidden":""}"></div>
     ${isSuperAdmin ? `<div id="atab-users" class="${subTab!=="users"?"hidden":""}"></div>` : ""}`;
   view.querySelectorAll("[data-atab]").forEach(t => t.addEventListener("click", () => go("admin", t.dataset.atab)));
+  renderStatisticsDashboard(document.getElementById("atab-statistics"), stats);
   renderAdminSettings(document.getElementById("atab-settings"), settings);
   renderCRMSimulator(document.getElementById("atab-crm"));
   renderAdminOrders(document.getElementById("atab-orders"), pendingOrders, allOrders, wf.states);
@@ -587,6 +566,57 @@ ROUTES.admin = async (view, arg) => {
   renderSwagCatalog(document.getElementById("atab-catalog"));
   if (isSuperAdmin) renderUserManagement(document.getElementById("atab-users"), allUsers);
 };
+
+// ---- Admin: Statistics dashboard ----
+function renderStatisticsDashboard(el, s) {
+  const medals = {1:"🥇",2:"🥈",3:"🥉"};
+  const roleLabel = { user: "Employees", admin: "Admins", superadmin: "SuperAdmins" };
+  const statusLabel = { pending: "Pending", approved: "Approved", shipped: "Shipped", rejected: "Rejected" };
+  el.innerHTML = `
+    <div class="stats">
+      ${sc(s.kudos_count,"kudos given")}${sc(s.points_awarded,"points awarded")}
+      ${sc(s.people_recognized,"people recognized")}${sc(s.total_users,"total users")}
+    </div>
+    <div class="admin-group-title">Points by source</div>
+    <div class="stats">
+      ${sc(s.kudos_points,"kudos points")}${sc(s.crm_points,"CRM points")}
+      ${sc(s.github_points,"GitHub points")}${sc(s.crm_events + s.github_activities,"tracked activities")}
+    </div>
+    <div class="admin-group-title">Top earners (all time)</div>
+    <div class="card">
+      ${s.top_earners.map(r => `
+        <div class="lb-row">
+          <div class="lb-rank ${r.rank<=3?"top":""}">${medals[r.rank]||r.rank}</div>
+          ${avatarHTML(r.user,38)}
+          <div class="lb-name">${esc(r.user.name)}<div class="lb-sub">${esc(r.user.title||"")}${r.user.department?" · "+esc(r.user.department):""}</div></div>
+          <div class="lb-pts">${r.points} pts</div>
+        </div>`).join("") || empty("📊","No points awarded yet.")}
+    </div>
+    <div class="admin-group-title">Recognition by core value</div>
+    <div class="card admin-card">
+      ${s.value_breakdown.map(v => `
+        <div class="weight-field">
+          <div><div class="wf-label">${v.value.emoji} ${esc(v.value.label)}</div></div>
+          <div class="wf-desc">${v.count} kudos</div>
+        </div>`).join("") || empty("🌱","No kudos yet.")}
+    </div>
+    <div class="admin-group-title">Users by role</div>
+    <div class="card admin-card">
+      ${Object.entries(s.role_counts).map(([role, count]) => `
+        <div class="weight-field">
+          <div><div class="wf-label">${roleLabel[role] || role}</div></div>
+          <div class="wf-desc">${count}</div>
+        </div>`).join("")}
+    </div>
+    <div class="admin-group-title">Swag orders by status</div>
+    <div class="card admin-card">
+      ${Object.entries(s.swag_orders_by_status).map(([status, count]) => `
+        <div class="weight-field">
+          <div><div class="wf-label">${statusLabel[status] || status}</div></div>
+          <div class="wf-desc">${count}</div>
+        </div>`).join("") || empty("🎁","No swag orders yet.")}
+    </div>`;
+}
 
 // ---- Notifications stream ----
 ROUTES.notifications = async (view) => {
