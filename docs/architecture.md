@@ -131,7 +131,7 @@ Wipes and reseeds the database. Run with `python -m app.seed`. Seeds:
 
 Single-page app. No framework, no build step. Entry: `static/index.html`.
 
-**Branding:** The app displays as **OpenTeams Morale** — topbar shows `static/openteams-morale-logo.svg` (OpenTeams logo with "Morale" subtitle baked in as SVG text). The 🎉 Give Kudos button is icon-only in the topbar; the user's giving balance appears as a stat on their own profile page rather than in the topbar.
+**Branding:** The app displays as **OpenTeams Kudos** — topbar shows `static/openteams-morale-logo.svg` (OpenTeams logo with "Kudos" subtitle baked in as SVG text). The 🎉 Give Kudos button floats as a fixed circular button in the bottom-right corner of the viewport; the user's giving balance appears as a stat on their own profile page rather than in the topbar.
 
 ### `static/app.js`
 Routing: `go(route, arg, push=true)` dispatches to `ROUTES[route](view, arg)` and calls `history.pushState()`. A `popstate` listener handles browser back/forward. `urlToRoute(pathname)` and `routeToUrl(route, arg)` map between URL paths and route state. Routes: `feed`, `leaderboard`, `people`, `profile`, `activity`, `rewards`, `admin`, `notifications`.

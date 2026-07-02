@@ -166,6 +166,10 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
   enforcement).
 - [ ] **README / setup docs** and a **demo script** for the shareout.
 - [ ] ❓ **Deployment** target — local-only for demo, or hosted somewhere?
+- [x] **Automatic dark mode** — theme follows the OS/browser `prefers-color-scheme` setting site-wide
+  via CSS custom properties (no manual toggle). Introduced a `--heading` variable (distinct from the
+  fixed brand `--navy`) so heading/accent text flips for contrast against dark surfaces, and a
+  `--header-bg` variable so the topbar can be lightened independently of card surfaces for logo contrast.
 
 ---
 
@@ -224,11 +228,11 @@ app/
   seed.py          — Wipe + reseed with 10 employees, 15 kudos, 13 GitHub + 23 CRM contributions, 9 swag items, swag orders
 
 static/
-  index.html             — HTML shell (login, topbar with 🎉 give button, give modal)
+  index.html             — HTML shell (login, topbar, floating 🎉 give button, give modal)
   styles.css             — OpenTeams palette, Airbnb-minimal + swag/workflow/notification styles
   app.js                 — Vanilla JS SPA: feed, leaderboard, people, profile, rewards, admin
   openteams-logo.png     — OpenTeams horizontal logo (dark, for light backgrounds)
-  openteams-morale-logo.svg — Composite logo: OpenTeams PNG + "Morale" SVG text; used in topbar + login
+  openteams-morale-logo.svg — Composite logo: OpenTeams PNG + "Kudos" SVG text; used in topbar + login
 
 requirements.txt   — Python dependencies (fastapi, uvicorn, pydantic, httpx, tinydb)
 requirements.md    — This file

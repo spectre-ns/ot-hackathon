@@ -362,12 +362,14 @@ def giving_balance(uid: int) -> int:
 
 
 def redeemed_points(uid: int) -> int:
-    """Points locked in approved + pending swag orders (not available to spend again)."""
+    """Points locked in non-terminal swag orders (not available to spend again)."""
+    from .workflow import is_terminal as _is_terminal
+    wf = get_workflow()
     with _lock:
         orders = _table("swag_orders").search(Query().user_id == uid)
     return sum(
         o["points_cost"] for o in orders
-        if o.get("status") in ("pending", "approved")
+        if not _is_terminal(wf, o.get("status", "pending"))
     )
 
 
@@ -409,7 +411,8 @@ def update_swag_item(iid: int, **fields) -> dict | None:
 
 # --- swag orders -------------------------------------------------------------
 def create_swag_order(user_id: int, item_id: int, points_cost: int,
-                      item_name: str, notes: str = "") -> dict:
+                      item_name: str, notes: str = "",
+                      current_state: str = "pending") -> dict:
     with _lock:
         oid = _table("swag_orders").insert({
             "user_id": user_id,
@@ -417,7 +420,9 @@ def create_swag_order(user_id: int, item_id: int, points_cost: int,
             "item_name": item_name,
             "points_cost": points_cost,
             "notes": notes,
-            "status": "pending",
+            "current_state": current_state,
+            "status": current_state,
+            "transition_log": [],
             "created_at": utcnow_iso(),
             "reviewed_at": None,
             "reviewer_id": None,
@@ -474,7 +479,7 @@ def get_workflow() -> dict:
         if not rows:
             t.insert(DEFAULT_WORKFLOW)
             rows = t.all()
-        return dict(rows[0])
+        return _with_id(rows[0])
 
 
 def save_workflow(wf: dict) -> dict:

@@ -27,5 +27,10 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 DEFAULT_MONTHLY_ALLOWANCE = int(os.getenv("DEFAULT_MONTHLY_ALLOWANCE", "100"))
 
 
+# Set DEMO_LOGIN=false to disable the password-free demo login endpoint in
+# production. Defaults to enabled so the app works out-of-the-box without OAuth.
+DEMO_LOGIN = os.getenv("DEMO_LOGIN", "true").lower() == "true"
+
+
 def github_oauth_enabled() -> bool:
     return bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET)

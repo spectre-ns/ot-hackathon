@@ -56,7 +56,7 @@ def is_terminal(wf: dict, state_id: str) -> bool:
     for s in wf["states"]:
         if s["id"] == state_id:
             return s.get("is_terminal", False)
-    return True
+    return False  # unknown state treated as active, not terminal
 
 
 def available_transitions(wf: dict, current_state: str) -> list[dict]:

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from . import auth, db, github_sync, workflow as wf_engine
-from .config import github_oauth_enabled
+from .config import DEMO_LOGIN, github_oauth_enabled
 from .crm_events import CRM_EVENT_TYPES, CRM_EVENTS_BY_KEY, event_points
 from .schemas import (
     CRMEventBody, DemoLoginBody, DeleteTransitionBody, KudosBody,
@@ -112,11 +112,13 @@ def set_session_cookie(response: Response, token: str) -> None:
 # --------------------------------------------------------------------------
 @app.get("/api/config")
 def get_config():
+    settings = db.get_settings()
+    public_settings = {k: v for k, v in settings.items() if k != "crm_api_key"}
     return {
         "github_oauth_enabled": github_oauth_enabled(),
         "core_values": CORE_VALUES,
         "crm_event_types": CRM_EVENT_TYPES,
-        "settings": db.get_settings(),
+        "settings": public_settings,
     }
 
 
@@ -148,6 +150,8 @@ async def github_callback(code: str = "", state: str = ""):
 
 @app.post("/api/auth/demo")
 def demo_login(body: DemoLoginBody, response: Response):
+    if not DEMO_LOGIN:
+        raise HTTPException(403, "Demo login is disabled on this server.")
     user = db.get_user(body.user_id)
     if not user:
         raise HTTPException(404, "User not found")
@@ -397,7 +401,8 @@ async def crm_webhook(body: CRMEventBody, request: Request):
     """
     key = request.headers.get("X-CRM-Key", "")
     settings = db.get_settings()
-    if not key or key != settings.get("crm_api_key", ""):
+    expected = settings.get("crm_api_key", "")
+    if not key or not secrets.compare_digest(key, expected):
         raise HTTPException(401, "Invalid or missing X-CRM-Key header.")
     return _apply_crm_event(body)
 
@@ -429,7 +434,7 @@ def crm_events(admin=Depends(auth.require_admin)):
 # Admin settings
 # --------------------------------------------------------------------------
 @app.get("/api/settings")
-def read_settings():
+def read_settings(admin=Depends(auth.require_admin)):
     return db.get_settings()
 
 
@@ -472,21 +477,12 @@ def place_order(item_id: int, body: SwagOrderBody, user: dict = Depends(auth.cur
             f"Not enough points. You have {spendable} available "
             f"but this item costs {item['point_cost']}.")
     wf = db.get_workflow()
+    init = wf_engine.initial_state(wf)
     order = db.create_swag_order(
         user_id=user["id"], item_id=item_id,
         points_cost=item["point_cost"], item_name=item["name"],
-        notes=body.notes,
+        notes=body.notes, current_state=init,
     )
-    # Set initial workflow state and seed the transition log.
-    init = wf_engine.initial_state(wf)
-    db.transition_swag_order.__wrapped__ if False else None  # sentinel
-    with db._lock:
-        from tinydb import Query as Q
-        db._table("swag_orders").update(
-            {"current_state": init, "status": init, "transition_log": []},
-            doc_ids=[order["id"]],
-        )
-    order = db.get_swag_order(order["id"])
     # Notify all admins of the new order.
     for admin_user in db.all_users():
         if admin_user.get("is_admin"):
@@ -545,7 +541,8 @@ def transition_order(order_id: int, body: OrderTransitionBody,
     order = db.get_swag_order(order_id)
     if not order:
         raise HTTPException(404, "Order not found")
-    # Non-admins can only cancel their own order from the initial state.
+    if not actor.get("is_admin") and order["user_id"] != actor["id"]:
+        raise HTTPException(403, "You can only modify your own orders.")
     t = wf_engine.find_transition(wf, body.transition_id)
     if not t:
         raise HTTPException(400, "Transition not found")
@@ -566,8 +563,11 @@ def transition_order(order_id: int, body: OrderTransitionBody,
     msg = f"Your order for **{order['item_name']}** moved to: {state['name']}"
     if body.reason:
         msg += f" — {body.reason}"
-    db.create_notification(order["user_id"], msg,
-                           kind="success" if wf_engine.is_terminal(wf, state["id"]) else "info")
+    if wf_engine.is_terminal(wf, state["id"]):
+        kind = "warning" if "reject" in state["id"].lower() else "success"
+    else:
+        kind = "info"
+    db.create_notification(order["user_id"], msg, kind=kind)
     return _enrich_order(updated, wf)
 
 

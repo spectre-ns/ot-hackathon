@@ -321,7 +321,7 @@ ROUTES.profile = async (view, userId) => {
         return `
         <div class="card act-card">
           <div class="act-top">
-            <span class="contrib-kind" style="background:#eef1ff;color:var(--blue)">${et.emoji}</span>
+            <span class="contrib-kind" style="background:var(--blue-soft);color:var(--blue)">${et.emoji}</span>
             <div class="act-body">
               <div class="act-title">${c.artifact_url?`<a href="${esc(c.artifact_url)}" target="_blank" rel="noopener" style="color:var(--blue)">${esc(c.title)}</a>`:esc(c.title)}</div>
               <div class="act-meta">${esc(et.label)} · ${esc(c.company||"")}${c.company?" · ":""}${timeAgo(c.happened_at)}</div>
@@ -399,7 +399,7 @@ function activityCard(c) {
   const user = c.user;
   const kindBadge = isGH
     ? `<span class="contrib-kind ${c.kind}">${c.kind==="pr"?"PR":"Issue"}</span>`
-    : `<span class="contrib-kind" style="background:#eef1ff;color:var(--blue)">${c.event_emoji||"📋"}</span>`;
+    : `<span class="contrib-kind" style="background:var(--blue-soft);color:var(--blue)">${c.event_emoji||"📋"}</span>`;
   const titleHtml = (c.url||c.artifact_url)
     ? `<a href="${esc(c.url||c.artifact_url)}" target="_blank" rel="noopener" style="color:var(--blue)">${esc(c.title)}</a>`
     : esc(c.title||"—");
@@ -937,7 +937,7 @@ function showTransitionDialog(fromName, toName, onConfirm, onCancel) {
   overlay.innerHTML = `
     <div class="modal-card">
       <div style="font-size:13px;color:var(--muted);margin-bottom:4px">${esc(fromName)} → ${esc(toName)}</div>
-      <h3 style="margin:0 0 20px;color:var(--navy)">New Transition</h3>
+      <h3 style="margin:0 0 20px;color:var(--heading)">New Transition</h3>
       <div class="field" style="margin-bottom:16px">
         <span>Label</span>
         <input type="text" id="wftd-label" class="select" placeholder="e.g. Approve, Reject…">

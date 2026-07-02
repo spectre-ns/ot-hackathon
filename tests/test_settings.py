@@ -19,12 +19,12 @@ VALID_SETTINGS = {
 
 
 class TestSettingsRead:
-    def test_read_settings_is_public(self, client):
-        resp = client.get("/api/settings")
-        assert resp.status_code == 200
+    def test_read_settings_requires_admin(self, client, admin_client):
+        assert client.get("/api/settings").status_code == 401
+        assert admin_client.get("/api/settings").status_code == 200
 
-    def test_settings_has_expected_fields(self, client):
-        resp = client.get("/api/settings")
+    def test_settings_has_expected_fields(self, admin_client):
+        resp = admin_client.get("/api/settings")
         data = resp.json()
         assert "pr_points" in data
         assert "issue_points" in data
@@ -32,12 +32,12 @@ class TestSettingsRead:
         assert "github_accumulation_enabled" in data
         assert "crm_api_key" in data
 
-    def test_default_github_accumulation_is_false(self, client):
-        resp = client.get("/api/settings")
+    def test_default_github_accumulation_is_false(self, admin_client):
+        resp = admin_client.get("/api/settings")
         assert resp.json()["github_accumulation_enabled"] is False
 
-    def test_default_monthly_allowance(self, client):
-        resp = client.get("/api/settings")
+    def test_default_monthly_allowance(self, admin_client):
+        resp = admin_client.get("/api/settings")
         assert resp.json()["monthly_allowance"] == 100  # DEFAULT_MONTHLY_ALLOWANCE
 
     def test_api_config_endpoint(self, client):
@@ -47,6 +47,10 @@ class TestSettingsRead:
         assert "core_values" in data
         assert "crm_event_types" in data
         assert "settings" in data
+
+    def test_api_config_does_not_leak_crm_api_key(self, client):
+        data = client.get("/api/config").json()
+        assert "crm_api_key" not in data.get("settings", {})
 
 
 class TestSettingsWrite:
