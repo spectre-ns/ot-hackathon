@@ -207,9 +207,11 @@ def run():
     # Seed one pending swag order so the admin approval UI is populated.
     guido = users[8]
     item = db.all_swag_items()[0]  # first item = T-shirt
-    db.create_swag_order(user_id=guido["id"], item_id=item["id"],
-                         points_cost=item["point_cost"], item_name=item["name"],
-                         notes="Size L please")
+    db.create_swag_order(
+        user_id=guido["id"],
+        line_items=[{"item_id": item["id"], "item_name": item["name"],
+                     "qty": 1, "unit_cost": item["point_cost"]}],
+        notes="Size L please")
     from .workflow import initial_state
     wf = db.get_workflow()
     init = initial_state(wf)

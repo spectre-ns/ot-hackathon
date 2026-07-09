@@ -1,5 +1,5 @@
 """Pydantic request bodies."""
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -47,6 +47,17 @@ class SwagItemBody(BaseModel):
 
 class SwagOrderBody(BaseModel):
     item_id: int
+    notes: str = Field(default="", max_length=500)
+
+
+class CartLineBody(BaseModel):
+    item_id: int
+    qty: int = Field(default=1, ge=1, le=100)
+
+
+class CartOrderBody(BaseModel):
+    """Check out a cart of swag as a single grouped order."""
+    items: List[CartLineBody] = Field(min_length=1, max_length=50)
     notes: str = Field(default="", max_length=500)
 
 

@@ -31,6 +31,17 @@ DEFAULT_MONTHLY_ALLOWANCE = int(os.getenv("DEFAULT_MONTHLY_ALLOWANCE", "100"))
 # production. Defaults to enabled so the app works out-of-the-box without OAuth.
 DEMO_LOGIN = os.getenv("DEMO_LOGIN", "true").lower() == "true"
 
+# --- Slack (optional) -----------------------------------------------------
+# Post kudos announcements to a Slack channel via an Incoming Webhook.
+# Create one at https://api.slack.com/messaging/webhooks and paste the URL
+# here. Leave unset to keep Slack posting disabled (the default) — the app
+# works fine without it.
+SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
+
 
 def github_oauth_enabled() -> bool:
     return bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET)
+
+
+def slack_enabled() -> bool:
+    return bool(SLACK_WEBHOOK_URL)

@@ -409,16 +409,67 @@ def update_swag_item(iid: int, **fields) -> dict | None:
     return get_swag_item(iid)
 
 
+def adjust_stock(changes: list[tuple[int, int]], *, verify: bool = False) -> str | None:
+    """Atomically apply stock deltas to items with finite stock.
+
+    ``changes`` is a list of ``(item_id, delta)``; a negative delta reserves
+    stock (an order), a positive delta returns it (a rejection). Items with
+    ``stock is None`` (unlimited) are ignored. When ``verify`` is True, every
+    reservation is checked against current stock first and, if any would go
+    negative, nothing is applied and an error message is returned.
+    """
+    with _lock:
+        if verify:
+            for iid, delta in changes:
+                if delta >= 0:
+                    continue
+                it = _with_id(_table("swag_items").get(doc_id=iid))
+                if it is None or not it.get("is_available", True):
+                    return "One of the items is no longer available."
+                stock = it.get("stock")
+                if stock is not None and stock + delta < 0:
+                    left = stock
+                    return (f"Not enough stock for {it['name']} — "
+                            f"only {left} left.")
+        for iid, delta in changes:
+            it = _with_id(_table("swag_items").get(doc_id=iid))
+            if it is None:
+                continue
+            stock = it.get("stock")
+            if stock is None:
+                continue
+            _table("swag_items").update({"stock": max(0, stock + delta)}, doc_ids=[iid])
+    return None
+
+
 # --- swag orders -------------------------------------------------------------
-def create_swag_order(user_id: int, item_id: int, points_cost: int,
-                      item_name: str, notes: str = "",
+def _order_summary(line_items: list[dict]) -> str:
+    """Human-readable one-line summary of a cart, e.g. '2× Hoodie, T-Shirt'."""
+    parts = []
+    for li in line_items:
+        prefix = f"{li['qty']}× " if li.get("qty", 1) > 1 else ""
+        parts.append(prefix + li["item_name"])
+    return ", ".join(parts)
+
+
+def create_swag_order(user_id: int, line_items: list[dict], notes: str = "",
                       current_state: str = "pending") -> dict:
+    """Create a grouped swag order.
+
+    ``line_items`` is a list of ``{item_id, item_name, qty, unit_cost}``.
+    ``points_cost`` is the total; ``item_id``/``item_name`` mirror the first
+    line (and, for a single-line order, the whole order) for backward-compat
+    with callers that predate multi-item carts.
+    """
+    total = sum(li["qty"] * li["unit_cost"] for li in line_items)
+    first = line_items[0]
     with _lock:
         oid = _table("swag_orders").insert({
             "user_id": user_id,
-            "item_id": item_id,
-            "item_name": item_name,
-            "points_cost": points_cost,
+            "line_items": line_items,
+            "item_id": first["item_id"],
+            "item_name": _order_summary(line_items),
+            "points_cost": total,
             "notes": notes,
             "current_state": current_state,
             "status": current_state,

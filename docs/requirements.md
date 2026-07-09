@@ -79,6 +79,13 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
   a styled emoji on a colored background if no `image_url` is set.
 - [x] **Visual workflow stepper on orders** — each order card (user "My Orders" tab and admin Approvals
   tab) shows a horizontal progress bar through all workflow states, color-coded and labeled.
+- [x] **Swag cart & grouped checkout** — users add multiple swag items (with quantities) to a client-side
+  cart and check out via `POST /api/swag/order`; the cart becomes a single grouped order carrying all
+  line items, approved/shipped as one unit through the existing workflow. The legacy single-item endpoint
+  `POST /api/swag/{id}/order` remains for backward compatibility.
+- [x] **Stock enforcement** — placing an order reserves (decrements) stock on finite-stock items; orders
+  exceeding available stock are rejected with HTTP 409, and rejecting an order restores its reserved
+  stock. Unlimited-stock items (`stock = null`) are never gated.
 
 ### Configurable workflow manager (JIRA-inspired)
 - [x] **State machine** stored in TinyDB and fully editable via the admin UI.
@@ -103,6 +110,14 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - [x] **Notification deep-link navigation** — clicking a notification routes to the relevant action (approval notifications → Admin panel Approvals tab).
 - [x] **Full notification stream page** — clicking the bell opens a dedicated notification stream page, not just a dropdown.
 - [x] **Seeded notifications** — seed data includes realistic pending notifications (3 per admin, 1 per regular user) so the stream is non-empty on first load.
+
+### Slack integration
+- [x] **Outbound kudos announcements** — when a kudos is given, post an announcement (giver, receiver,
+  points, core value, message) to a Slack channel via an **Incoming Webhook** (`SLACK_WEBHOOK_URL`).
+- [x] **Disabled by default** — with no `SLACK_WEBHOOK_URL` set, `slack.notify_kudos()` is a silent
+  no-op; the app runs identically in demo mode.
+- [x] **Failure isolation** — a Slack outage, timeout, or non-200 response must never fail the kudos
+  request; errors are swallowed and logged, and `notify_kudos` returns `False`.
 
 ---
 
@@ -163,8 +178,8 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - [x] **Seed data** — 10 employees, 15 kudos, 13 GitHub contributions, 23 CRM events across 7 employees, 9 swag items.
   Seed intentionally timestamps a subset of events to `days_ago(0)` so "This month" leaderboard is
   never empty regardless of what day of the month the seed is run.
-- [x] **Test suite** — 182 pytest tests covering auth, kudos, feed, statistics, activity, swag,
-  workflow, CRM, GitHub, notifications, settings, and roles. Includes `TestSeedActivity` (guards
+- [x] **Test suite** — 192 pytest tests covering auth, kudos, feed, statistics, activity, swag,
+  workflow, CRM, GitHub, notifications, settings, roles, and Slack. Includes `TestSeedActivity` (guards
   against seed-timing regressions), `TestActivityFeed` (9 tests), `TestStatisticsAccess`/
   `TestStatisticsData` (admin-only dashboard, access control), and `TestRoleAPI` (role hierarchy
   enforcement).
@@ -179,7 +194,9 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 
 ## 4. Out of scope (for now)
 
-- ⛔ Real **Slack** (or other chat) integration — noted as a possible future integration.
+- [x] **Outbound Slack** kudos announcements via Incoming Webhook — see §2 Slack integration.
+- ⛔ **Bidirectional Slack bot** (slash commands to give kudos, Socket Mode, DMs) — outbound
+  webhook announcements are built; a full interactive bot remains future work.
 - ⛔ **Email / push notifications** — in-app only.
 - ⛔ Production-grade **auth hardening**, multi-tenant, audit logging.
 - ⛔ Migration to a **server-based DB** (Postgres/Mongo) — TinyDB sufficient for hackathon.
@@ -212,6 +229,8 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - **Auth:** GitHub OAuth (optional) + demo login; httponly cookie sessions.
 - **GitHub:** `httpx` against the GitHub Search API for merged PRs / closed issues.
 - **CRM:** Webhook endpoint + 6 event types + admin simulator; Salesforce adapter pattern documented.
+- **Slack:** Outbound-only via `httpx` POST to an Incoming Webhook (`SLACK_WEBHOOK_URL`); posts a
+  Block Kit kudos announcement on each kudos. Disabled by default; failures never break the request.
 - **Workflow:** JIRA-inspired state machine stored in TinyDB; full transition audit log per order.
 - **Frontend:** Vanilla HTML/CSS/JS SPA (no build step), OpenTeams palette, Airbnb-minimal styling.
 - **venv:** `~/miniconda3/bin/python -m venv .venv` (requires Python 3.14 from Miniconda, not system Python).
@@ -225,10 +244,11 @@ app/
   main.py          — All FastAPI routes (auth, kudos, feed, activity, GitHub, CRM, swag, workflow, notifications)
   db.py            — TinyDB repository layer (all reads + writes; thread-safe RLock)
   auth.py          — Session dependency; require_admin(); upsert_github_user()
-  config.py        — Env vars; github_oauth_enabled() helper
+  config.py        — Env vars; github_oauth_enabled() + slack_enabled() helpers
   values.py        — 6 core values with colors
   crm_events.py    — 6 CRM event types, configurable weights, event_points()
   github_sync.py   — GitHub Search API sync (merged PRs + closed issues); see architecture.md for details
+  slack.py         — Outbound Slack Incoming Webhook posting (notify_kudos); no-op when unconfigured
   workflow.py      — Workflow state machine helpers (add/delete states & transitions)
   schemas.py       — Pydantic request body models
   seed.py          — Wipe + reseed with 10 employees, 15 kudos, 13 GitHub + 23 CRM contributions, 9 swag items, swag orders
@@ -259,6 +279,7 @@ tests/
   test_notifications.py — Order and transition notifications; notification endpoints
   test_settings.py    — Settings read/write; admin-only enforcement; defaults validation
   test_roles.py       — Three-tier role system (SuperAdmin/Admin/User); role field, API enforcement
+  test_slack.py       — Outbound Slack webhook: disabled-by-default no-op, payload contents, failure isolation, kudos endpoint integration
 
 .claude/skills/
   seed/SKILL.md          — How to wipe + reseed the database (Windows + Mac/Linux steps)

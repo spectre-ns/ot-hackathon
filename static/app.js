@@ -26,8 +26,60 @@ const api = {
 // State
 // --------------------------------------------------------------------------
 const state = {
-  me: null, config: null, users: [], route: "feed", routeArg: null,
+  me: null, config: null, users: [], route: "feed", routeArg: null, cart: [],
 };
+
+// --------------------------------------------------------------------------
+// Swag cart (client-side, persisted per user in localStorage)
+// --------------------------------------------------------------------------
+function cartKey() { return `otk_cart_${state.me ? state.me.id : "anon"}`; }
+function loadCart() {
+  try { state.cart = JSON.parse(localStorage.getItem(cartKey())) || []; }
+  catch { state.cart = []; }
+}
+function saveCart() {
+  try { localStorage.setItem(cartKey(), JSON.stringify(state.cart)); } catch {}
+  renderCartBadge();
+}
+function cartCount() { return state.cart.reduce((n, l) => n + l.qty, 0); }
+function cartTotal() { return state.cart.reduce((n, l) => n + l.qty * l.cost, 0); }
+function cartLine(itemId) { return state.cart.find(l => l.itemId === itemId); }
+function cartMax(line) { return line.stock != null ? line.stock : Infinity; }
+
+function cartAdd(item, qty = 1) {
+  const line = cartLine(item.id);
+  const max = item.stock != null ? item.stock : Infinity;
+  const current = line ? line.qty : 0;
+  const next = Math.min(current + qty, max);
+  if (next <= current) { toast(`Only ${max} of ${item.name} available`, "error"); return; }
+  if (line) { line.qty = next; }
+  else state.cart.push({
+    itemId: item.id, name: item.name, cost: item.point_cost,
+    qty: next, stock: item.stock, image_url: item.image_url || "",
+  });
+  saveCart();
+  toast(`Added ${item.name} to cart`, "success");
+}
+function cartSetQty(itemId, qty) {
+  const line = cartLine(itemId);
+  if (!line) return;
+  const clamped = Math.max(0, Math.min(qty, cartMax(line)));
+  if (clamped === 0) { cartRemove(itemId); return; }
+  line.qty = clamped; saveCart();
+}
+function cartRemove(itemId) {
+  state.cart = state.cart.filter(l => l.itemId !== itemId);
+  saveCart();
+}
+function cartClear() { state.cart = []; saveCart(); }
+
+function renderCartBadge() {
+  const badge = document.getElementById("cart-badge");
+  if (!badge) return;
+  const n = cartCount();
+  if (n > 0) { badge.textContent = n > 9 ? "9+" : n; badge.classList.remove("hidden"); }
+  else badge.classList.add("hidden");
+}
 
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
@@ -97,7 +149,9 @@ $("#demo-login-btn").addEventListener("click", async () => {
 });
 function showApp() {
   $("#login").classList.add("hidden"); $("#app").classList.remove("hidden");
+  loadCart();
   renderTopbar();
+  renderCartBadge();
   $$(".admin-only").forEach(e => e.classList.toggle("hidden", !state.me.is_admin));
   const { route, arg } = urlToRoute(location.pathname);
   history.replaceState({ route, arg }, "", location.pathname);
@@ -415,11 +469,17 @@ ROUTES.rewards = async (view, arg) => {
   ]);
   const spendable = catalog.spendable_points;
   const pendingCount = myOrders.filter(o => o.current_state && o.current_state !== "approved" && o.current_state !== "rejected" && o.current_state !== "shipped").length;
+  const catalogById = new Map(catalog.items.map(i => [i.id, i]));
   view.innerHTML = `
     <div class="page-head">
       <h2>Rewards</h2>
-      <div class="balance-pill" style="font-size:15px">
-        <span>⭐</span> <strong>${spendable}</strong> <span style="color:var(--muted);font-size:13px">pts to spend</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="btn btn-ghost" id="view-cart-btn" style="font-size:14px;padding:8px 14px">
+          🛒 Cart${cartCount()?` (${cartCount()})`:""}
+        </button>
+        <div class="balance-pill" style="font-size:15px">
+          <span>⭐</span> <strong>${spendable}</strong> <span style="color:var(--muted);font-size:13px">pts to spend</span>
+        </div>
       </div>
     </div>
     <div class="tabs">
@@ -437,9 +497,12 @@ ROUTES.rewards = async (view, arg) => {
       ${myOrders.length ? myOrders.map(o => orderCard(o, wf.states)).join("") : empty("📦","You haven't placed any orders yet.")}
     </div>`;
   view.querySelectorAll("[data-rtab]").forEach(t => t.addEventListener("click", () => go("rewards", t.dataset.rtab)));
-  view.querySelectorAll(".redeem-btn").forEach(btn => {
-    btn.addEventListener("click", () => openRedeemModal(
-      parseInt(btn.dataset.itemId, 10), btn.dataset.itemName, parseInt(btn.dataset.cost, 10)));
+  view.querySelector("#view-cart-btn").addEventListener("click", () => openCartModal());
+  view.querySelectorAll(".add-cart-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const item = catalogById.get(parseInt(btn.dataset.itemId, 10));
+      if (item) { cartAdd(item); go("rewards", tab); }
+    });
   });
 };
 
@@ -466,23 +529,29 @@ function swagBg(name) {
 }
 
 function swagCard(item, spendable) {
-  const canAfford = spendable >= item.point_cost;
+  const outOfStock = item.stock != null && item.stock <= 0;
   const stockLabel = item.stock != null ? ` · ${item.stock} left` : "";
+  const inCart = cartLine(item.id);
   const thumb = item.image_url
     ? `<div class="swag-thumb"><img src="${esc(item.image_url)}" alt="${esc(item.name)}" loading="lazy"></div>`
     : `<div class="swag-thumb swag-thumb-emoji" style="background:${swagBg(item.name)}">${swagEmoji(item.name)}</div>`;
+  let action;
+  if (outOfStock) {
+    action = `<span class="swag-locked">Out of stock</span>`;
+  } else {
+    const inCartLabel = inCart ? `In cart (${inCart.qty})` : "Add to cart";
+    action = `<button class="btn btn-primary add-cart-btn" style="font-size:13px;padding:8px 14px"
+      data-item-id="${item.id}">${inCartLabel}</button>`;
+  }
   return `
-    <div class="card swag-card${!canAfford?" swag-unaffordable":""}">
+    <div class="card swag-card${outOfStock?" swag-unaffordable":""}">
       ${thumb}
       <div class="swag-body">
         <div class="swag-name">${esc(item.name)}</div>
         <div class="swag-desc">${esc(item.description)}</div>
         <div class="swag-footer">
           <span class="points-badge">${item.point_cost} pts${stockLabel}</span>
-          ${canAfford
-            ? `<button class="btn btn-primary redeem-btn" style="font-size:13px;padding:8px 14px"
-                data-item-id="${item.id}" data-item-name="${esc(item.name)}" data-cost="${item.point_cost}">Redeem</button>`
-            : `<span class="swag-locked">Need ${item.point_cost - spendable} more pts</span>`}
+          ${action}
         </div>
       </div>
     </div>`;
@@ -508,6 +577,16 @@ function orderStepper(o, wfStates) {
   return `<div class="os-stepper">${parts.join("")}</div>`;
 }
 
+// A compact bulleted list of an order's line items, shown only for multi-item
+// (cart) orders — single-item orders already read clearly from the title.
+function orderLineItemsHTML(o) {
+  const lines = o.line_items || [];
+  if (lines.length <= 1) return "";
+  return `<ul class="order-lines">${lines.map(li =>
+    `<li>${li.qty > 1 ? `${li.qty}× ` : ""}${esc(li.item_name)} <span class="ol-cost">${li.qty * li.unit_cost} pts</span></li>`
+  ).join("")}</ul>`;
+}
+
 function orderCard(o, wfStates) {
   const state_info = o.state_info || {};
   const color = state_info.color || "#888";
@@ -521,6 +600,7 @@ function orderCard(o, wfStates) {
         <span class="value-tag" style="background:${color}20;color:${color}">${esc(state_info.name||o.current_state||"pending")}</span>
         <span class="points-badge" style="background:#e6e8f0;color:var(--navy)">-${o.points_cost} pts</span>
       </div>
+      ${orderLineItemsHTML(o)}
       ${orderStepper(o, wfStates)}
     </div>`;
 }
@@ -839,6 +919,7 @@ function renderOrderList(orders, isAdmin = false, wfStates = []) {
           <span class="value-tag" style="background:${s.color||"#888"}20;color:${s.color||"#888"}">${esc(s.name||"pending")}</span>
           <span class="points-badge" style="background:#e6e8f0;color:var(--navy)">-${o.points_cost} pts</span>
         </div>
+        ${orderLineItemsHTML(o)}
         ${orderStepper(o, wfStates)}
         ${transitions.length ? `
           <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -1010,17 +1091,28 @@ function showTransitionDialog(fromName, toName, onConfirm, onCancel) {
 function buildWFDiagram(wf, {onDeleteState, onDeleteTransition, onCreateTransition, onHint}) {
   const NS = "http://www.w3.org/2000/svg";
   const states = wf.states, transitions = wf.transitions;
-  const W = 136, H = 50, GX = 90, GY = 92;
-  const cols = Math.min(Math.max(states.length, 1), 3);
-  const rows = Math.ceil(states.length / cols);
-  const SVG_W = cols * W + (cols - 1) * GX + 48;
-  const SVG_H = rows * H + (rows - 1) * GY + 56;
+  const W = 136, H = 50, GY = 92;
+  const rowOf = {};
+  states.forEach((s, i) => { rowOf[s.id] = i; });
 
-  // Compute grid positions
+  // Single-column layout: every state stacked vertically
   const pos = {};
   states.forEach((s, i) => {
-    pos[s.id] = {x: 24 + (i % cols) * (W + GX), y: 20 + Math.floor(i / cols) * (H + GY)};
+    pos[s.id] = {x: 24, y: 20 + i * (H + GY)};
   });
+
+  // Non-adjacent / reverse transitions route out to the right in dedicated
+  // lanes so the diagram stays a single column of states.
+  const LANE_GAP = 22, LANE_START = 30;
+  let laneCount = 0;
+  const laneOf = {};
+  transitions.forEach((t, i) => {
+    const isAdjacentForward = t.from !== t.to && rowOf[t.to] === rowOf[t.from] + 1;
+    if (!isAdjacentForward) { laneOf[i] = laneCount; laneCount++; }
+  });
+
+  const SVG_W = W + 48 + (laneCount ? LANE_START + laneCount * LANE_GAP + 60 : 0);
+  const SVG_H = states.length * H + Math.max(states.length - 1, 0) * GY + 56;
 
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("width", SVG_W); svg.setAttribute("height", SVG_H);
@@ -1059,27 +1151,32 @@ function buildWFDiagram(wf, {onDeleteState, onDeleteTransition, onCreateTransiti
   // ---- Draw transitions ----
   function drawTransitions() {
     while (tLayer.firstChild) tLayer.removeChild(tLayer.lastChild);
-    transitions.forEach(t => {
+    transitions.forEach((t, ti) => {
       const fp = pos[t.from], tp = pos[t.to];
       if (!fp || !tp) return;
 
-      // Compute bezier path from bottom-centre of `from` to top-centre of `to`
+      // Compute an orthogonal (right-angle) path. Adjacent forward transitions
+      // drop straight down the column; everything else routes out to a side
+      // lane and back in, using only horizontal/vertical segments.
       let d, lx, ly;
       if (t.from === t.to) {
-        // Self-loop
-        const cx = fp.x + W, cy = fp.y + H / 2;
-        d = `M${fp.x+W-4},${fp.y+H/2-8} C${cx+48},${cy-40} ${cx+48},${cy+40} ${fp.x+W-4},${fp.y+H/2+8}`;
-        lx = cx + 54; ly = cy;
-      } else {
+        // Self-loop: rectangular loop out to the right of the state
+        const loopX = fp.x + W + LANE_START + laneOf[ti] * LANE_GAP;
+        const oy = fp.y + H * 0.32, iy = fp.y + H * 0.68;
+        d = `M${fp.x+W},${oy} L${loopX},${oy} L${loopX},${iy} L${fp.x+W},${iy}`;
+        lx = loopX; ly = fp.y + H / 2;
+      } else if (rowOf[t.to] === rowOf[t.from] + 1) {
+        // Adjacent forward transition: straight vertical drop
         const ox = fp.x + W/2, oy = fp.y + H;
         const ix = tp.x + W/2, iy = tp.y;
-        const mx = (ox+ix)/2, my = (oy+iy)/2;
-        const dxn = ix-ox, dyn = iy-oy;
-        const len = Math.sqrt(dxn*dxn+dyn*dyn)||1;
-        const bend = Math.min(len*0.28, 55);
-        const cx = mx - (dyn/len)*bend, cy = my + (dxn/len)*bend;
-        d = `M${ox},${oy} Q${cx},${cy} ${ix},${iy}`;
-        lx = (ox + 2*cx + ix)/4; ly = (oy + 2*cy + iy)/4;
+        d = `M${ox},${oy} L${ix},${iy}`;
+        lx = ox; ly = (oy+iy)/2;
+      } else {
+        // Non-adjacent or backward transition: route via a side lane
+        const laneX = fp.x + W + LANE_START + laneOf[ti] * LANE_GAP;
+        const oy = fp.y + H/2, iy = tp.y + H/2;
+        d = `M${fp.x+W},${oy} L${laneX},${oy} L${laneX},${iy} L${tp.x+W},${iy}`;
+        lx = laneX; ly = (oy+iy)/2;
       }
 
       const g = document.createElementNS(NS, "g");
@@ -1454,6 +1551,7 @@ function renderUserManagement(el, users) {
 // Notification bell
 // --------------------------------------------------------------------------
 $("#notif-btn").addEventListener("click", () => go("notifications"));
+$("#cart-btn").addEventListener("click", () => openCartModal());
 
 // --------------------------------------------------------------------------
 // Give Kudos modal
@@ -1523,43 +1621,118 @@ $("#give-form").addEventListener("submit", async e => {
 });
 
 // --------------------------------------------------------------------------
-// Redeem swag modal
+// Swag cart modal
 // --------------------------------------------------------------------------
-function openRedeemModal(itemId, itemName, cost) {
+function cartLineHTML(line) {
+  const emoji = swagEmoji(line.name);
+  const thumb = line.image_url
+    ? `<img src="${esc(line.image_url)}" alt="" class="cart-thumb">`
+    : `<span class="cart-thumb cart-thumb-emoji" style="background:${swagBg(line.name)}">${emoji}</span>`;
+  const atMax = line.stock != null && line.qty >= line.stock;
+  return `
+    <div class="cart-line" data-item-id="${line.itemId}">
+      ${thumb}
+      <div class="cart-line-info">
+        <div class="cart-line-name">${esc(line.name)}</div>
+        <div class="cart-line-sub">${line.cost} pts each${line.stock!=null?` · ${line.stock} in stock`:""}</div>
+      </div>
+      <div class="qty-stepper">
+        <button class="qty-btn" data-cart-dec="${line.itemId}" aria-label="Decrease">−</button>
+        <span class="qty-val">${line.qty}</span>
+        <button class="qty-btn" data-cart-inc="${line.itemId}" aria-label="Increase" ${atMax?"disabled":""}>+</button>
+      </div>
+      <div class="cart-line-total">${line.qty * line.cost} pts</div>
+      <button class="icon-btn cart-remove" data-cart-remove="${line.itemId}" aria-label="Remove">✕</button>
+    </div>`;
+}
+
+function openCartModal() {
+  const existing = document.getElementById("cart-modal");
+  if (existing) existing.remove();
+  const total = cartTotal();
+  const spendable = state.me.spendable_points || 0;
+  const afford = total <= spendable;
+  const empty_ = state.cart.length === 0;
+  const body = empty_
+    ? `<p style="color:var(--muted);text-align:center;padding:24px 0">Your cart is empty. Add some swag from the catalog!</p>`
+    : `
+      <div class="cart-lines">${state.cart.map(cartLineHTML).join("")}</div>
+      <div class="cart-summary">
+        <span>Total</span>
+        <strong>${total} pts</strong>
+      </div>
+      <p style="color:${afford?"var(--muted)":"var(--danger,#d64545)"};font-size:14px;margin-top:4px">
+        ${afford
+          ? `Balance after checkout: <strong>${spendable - total} pts</strong>. Your manager will review and approve the order.`
+          : `You need ${total - spendable} more pts to check out.`}
+      </p>
+      <div class="field" style="margin-top:16px"><span>Notes for your manager (optional)</span>
+        <textarea id="cart-notes" class="select" rows="2" placeholder="e.g. Size L, ship to home address"></textarea></div>`;
   const html = `
-    <div class="modal-backdrop" id="redeem-modal">
+    <div class="modal-backdrop" id="cart-modal">
       <div class="modal">
-        <div class="modal-head"><h2>Redeem Swag</h2><button class="icon-btn" id="close-redeem">✕</button></div>
+        <div class="modal-head"><h2>Your Cart${cartCount()?` (${cartCount()})`:""}</h2><button class="icon-btn" id="close-cart">✕</button></div>
         <div style="padding:22px 26px">
-          <p>You're about to spend <strong>${cost} pts</strong> on <strong>${esc(itemName)}</strong>.</p>
-          <p style="color:var(--muted);font-size:14px">Your balance after this order: <strong>${state.me.spendable_points - cost} pts</strong>. Your manager will review and approve the order.</p>
-          <div class="field"><span>Notes for your manager (optional)</span>
-            <textarea id="redeem-notes" class="select" rows="2" placeholder="e.g. Size L, ship to home address"></textarea></div>
+          ${body}
           <div class="modal-foot">
-            <span class="form-error" id="redeem-error"></span>
-            <button class="btn btn-primary" id="redeem-confirm">Confirm order</button>
+            <span class="form-error" id="cart-error"></span>
+            ${empty_ ? "" :
+              `<button class="btn btn-ghost" id="cart-clear">Clear cart</button>
+               <button class="btn btn-primary" id="cart-checkout" ${afford?"":"disabled"}>Place order · ${total} pts</button>`}
           </div>
         </div>
       </div>
     </div>`;
   document.body.insertAdjacentHTML("beforeend", html);
-  const modal = document.getElementById("redeem-modal");
-  document.getElementById("close-redeem").addEventListener("click", () => modal.remove());
-  modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
-  document.getElementById("redeem-confirm").addEventListener("click", async () => {
-    const btn = document.getElementById("redeem-confirm"); btn.disabled = true;
+  const modal = document.getElementById("cart-modal");
+  const close = () => {
+    modal.remove();
+    // Refresh catalog "In cart (n)" labels if the Rewards page is showing.
+    if (state.route === "rewards") go("rewards", state.routeArg || "catalog");
+  };
+  document.getElementById("close-cart").addEventListener("click", close);
+  modal.addEventListener("click", e => { if (e.target === modal) close(); });
+
+  modal.querySelectorAll("[data-cart-inc]").forEach(b => b.addEventListener("click", () => {
+    const id = parseInt(b.dataset.cartInc, 10);
+    const line = cartLine(id); if (line) cartSetQty(id, line.qty + 1);
+    reopenCart();
+  }));
+  modal.querySelectorAll("[data-cart-dec]").forEach(b => b.addEventListener("click", () => {
+    const id = parseInt(b.dataset.cartDec, 10);
+    const line = cartLine(id); if (line) cartSetQty(id, line.qty - 1);
+    reopenCart();
+  }));
+  modal.querySelectorAll("[data-cart-remove]").forEach(b => b.addEventListener("click", () => {
+    cartRemove(parseInt(b.dataset.cartRemove, 10));
+    reopenCart();
+  }));
+
+  const clearBtn = document.getElementById("cart-clear");
+  if (clearBtn) clearBtn.addEventListener("click", () => { cartClear(); reopenCart(); });
+
+  const checkout = document.getElementById("cart-checkout");
+  if (checkout) checkout.addEventListener("click", async () => {
+    checkout.disabled = true;
     try {
-      await api.post(`/api/swag/${itemId}/order`, {notes: document.getElementById("redeem-notes").value});
-      modal.remove();
+      const items = state.cart.map(l => ({item_id: l.itemId, qty: l.qty}));
+      const notes = document.getElementById("cart-notes").value;
+      await api.post("/api/swag/order", {items, notes});
+      cartClear();
+      close();
       await refreshMe();
-      toast(`Order placed for ${itemName}! Awaiting approval.`, "success");
+      toast("Order placed! Awaiting approval.", "success");
       go("rewards", "orders");
     } catch(e) {
-      document.getElementById("redeem-error").textContent = e.message;
-      btn.disabled = false;
+      document.getElementById("cart-error").textContent = e.message;
+      checkout.disabled = false;
     }
   });
 }
+
+// Re-render the cart modal in place after a mutation (add/remove/qty change).
+// openCartModal() removes any existing modal first, so this is idempotent.
+function reopenCart() { openCartModal(); }
 
 // --------------------------------------------------------------------------
 // Confetti

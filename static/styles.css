@@ -258,6 +258,26 @@ textarea { resize: vertical; }
 .modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 6px; }
 .form-error { color: #d6502f; font-size: 14px; margin-right: auto; }
 
+/* ---------- swag cart ---------- */
+.cart-lines { display: flex; flex-direction: column; gap: 12px; max-height: 46vh; overflow-y: auto; }
+.cart-line { display: flex; align-items: center; gap: 12px; }
+.cart-thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
+.cart-thumb-emoji { display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.cart-line-info { flex: 1; min-width: 0; }
+.cart-line-name { font-weight: 600; color: var(--heading); font-size: 15px; }
+.cart-line-sub { color: var(--muted); font-size: 12.5px; }
+.cart-line-total { font-weight: 600; color: var(--navy); font-size: 14px; min-width: 62px; text-align: right; }
+.qty-stepper { display: flex; align-items: center; gap: 8px; }
+.qty-btn { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); font-size: 16px; cursor: pointer; line-height: 1; color: var(--text); }
+.qty-btn:hover:not(:disabled) { background: var(--line); }
+.qty-btn:disabled { opacity: .4; cursor: default; }
+.qty-val { min-width: 20px; text-align: center; font-weight: 600; }
+.cart-remove { color: var(--muted); }
+.cart-summary { display: flex; justify-content: space-between; align-items: baseline; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 17px; color: var(--heading); }
+.order-lines { list-style: none; margin: 8px 0 2px; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.order-lines li { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--text); padding: 3px 0; border-top: 1px dashed var(--line); }
+.order-lines .ol-cost { color: var(--muted); }
+
 /* ---------- toast / confetti ---------- */
 .toast-wrap { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 200; align-items: center; }
 .toast { background: var(--navy); color: #fff; padding: 13px 20px; border-radius: 999px; font-size: 14px; font-weight: 600;

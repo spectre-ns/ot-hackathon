@@ -11,11 +11,11 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import auth, db, github_sync, workflow as wf_engine
+from . import auth, db, github_sync, slack, workflow as wf_engine
 from .config import DEMO_LOGIN, github_oauth_enabled
 from .crm_events import CRM_EVENT_TYPES, CRM_EVENTS_BY_KEY, event_points
 from .schemas import (
-    CRMEventBody, DemoLoginBody, DeleteTransitionBody, KudosBody,
+    CartOrderBody, CRMEventBody, DemoLoginBody, DeleteTransitionBody, KudosBody,
     OrderTransitionBody, ReactBody, SettingsBody, SwagItemBody, SwagOrderBody,
     UserRoleBody, WorkflowStateBody, WorkflowTransitionBody,
 )
@@ -254,12 +254,16 @@ def give_kudos(body: KudosBody, user: dict = Depends(auth.current_user)):
     if body.points > balance:
         raise HTTPException(
             400, f"Not enough points. You have {balance} left to give this month.")
+    receiver = db.get_user(body.receiver_id)
     k = db.create_kudos(
         user["id"], body.receiver_id, body.points,
         body.value_key, body.message.strip(),
         artifact_url=body.artifact_url or "",
         artifact_label=body.artifact_label or "",
     )
+    # Announce to Slack if configured. Never fails the request (see slack.py).
+    slack.notify_kudos(user, receiver, body.points, body.value_key,
+                       body.message.strip())
     return enrich_kudos(k, user["id"])
 
 
@@ -504,33 +508,64 @@ def update_swag(item_id: int, body: SwagItemBody, admin=Depends(auth.require_adm
     return item
 
 
-@app.post("/api/swag/{item_id}/order")
-def place_order(item_id: int, body: SwagOrderBody, user: dict = Depends(auth.current_user)):
-    item = db.get_swag_item(item_id)
-    if not item or not item.get("is_available"):
-        raise HTTPException(404, "Item not available")
+def _place_order(user: dict, specs: list[tuple[int, int]], notes: str) -> dict:
+    """Validate points + stock for a cart of (item_id, qty) and place one order.
+
+    Raises HTTPException on any failure; on success reserves stock, creates a
+    single grouped order and notifies admins.
+    """
+    line_items: list[dict] = []
+    for item_id, qty in specs:
+        item = db.get_swag_item(item_id)
+        if not item or not item.get("is_available"):
+            raise HTTPException(404, "Item not available")
+        line_items.append({
+            "item_id": item_id,
+            "item_name": item["name"],
+            "qty": qty,
+            "unit_cost": item["point_cost"],
+        })
+    total = sum(li["qty"] * li["unit_cost"] for li in line_items)
     spendable = db.spendable_points(user["id"])
-    if item["point_cost"] > spendable:
+    if total > spendable:
         raise HTTPException(400,
             f"Not enough points. You have {spendable} available "
-            f"but this item costs {item['point_cost']}.")
+            f"but this order costs {total}.")
+    # Atomically verify + reserve stock for every finite-stock line.
+    err = db.adjust_stock([(li["item_id"], -li["qty"]) for li in line_items],
+                          verify=True)
+    if err:
+        raise HTTPException(409, err)
     wf = db.get_workflow()
     init = wf_engine.initial_state(wf)
     order = db.create_swag_order(
-        user_id=user["id"], item_id=item_id,
-        points_cost=item["point_cost"], item_name=item["name"],
-        notes=body.notes, current_state=init,
+        user_id=user["id"], line_items=line_items,
+        notes=notes, current_state=init,
     )
     # Notify all admins of the new order.
     for admin_user in db.all_users():
         if admin_user.get("is_admin"):
             db.create_notification(
                 admin_user["id"],
-                f"🛍️ {user['name']} placed a swag order: {item['name']} ({item['point_cost']} pts)",
+                f"🛍️ {user['name']} placed a swag order: {order['item_name']} ({total} pts)",
                 kind="warning",
                 link="/admin/orders",
             )
     return order
+
+
+@app.post("/api/swag/{item_id}/order")
+def place_order(item_id: int, body: SwagOrderBody, user: dict = Depends(auth.current_user)):
+    return _place_order(user, [(item_id, 1)], body.notes)
+
+
+@app.post("/api/swag/order")
+def place_cart_order(body: CartOrderBody, user: dict = Depends(auth.current_user)):
+    # Consolidate duplicate lines for the same item into a single qty.
+    qty_by_item: dict[int, int] = {}
+    for line in body.items:
+        qty_by_item[line.item_id] = qty_by_item.get(line.item_id, 0) + line.qty
+    return _place_order(user, list(qty_by_item.items()), body.notes)
 
 
 @app.get("/api/swag/orders")
@@ -563,10 +598,19 @@ def _enrich_order(order: dict, wf: dict) -> dict:
     item = db.get_swag_item(order["item_id"])
     state = wf_engine.state_info(wf, order.get("current_state", "pending"))
     transitions = wf_engine.available_transitions(wf, order.get("current_state", "pending"))
+    # Attach current catalog details (image/availability) to each line item.
+    lines = order.get("line_items") or [{
+        "item_id": order.get("item_id"),
+        "item_name": order.get("item_name"),
+        "qty": 1,
+        "unit_cost": order.get("points_cost", 0),
+    }]
+    enriched_lines = [{**li, "item": db.get_swag_item(li["item_id"])} for li in lines]
     return {
         **order,
         "user": public_user(user) if user else None,
         "item": item,
+        "line_items": enriched_lines,
         "state_info": state,
         "available_transitions": transitions,
     }
@@ -606,6 +650,10 @@ def transition_order(order_id: int, body: OrderTransitionBody,
     else:
         kind = "info"
     db.create_notification(order["user_id"], msg, kind=kind)
+    # A rejected order returns any reserved stock to the catalog.
+    if wf_engine.is_terminal(wf, state["id"]) and "reject" in state["id"].lower():
+        db.adjust_stock([(li["item_id"], li["qty"])
+                         for li in order.get("line_items", [])])
     return _enrich_order(updated, wf)
 
 

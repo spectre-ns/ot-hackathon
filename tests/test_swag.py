@@ -197,3 +197,120 @@ class TestSwagOrderPlacement:
         resp = user1_client.post(f"/api/swag/{item['id']}/order", json={"item_id": item["id"]})
         order = resp.json()
         assert order["current_state"] == "pending"
+
+    def test_single_order_has_line_items(self, admin_client, user1_client, user2_client, users):
+        item = _create_swag_item(admin_client, "Line Item", 50)
+        _give_kudos_to(user2_client, users["user1"]["id"], 60)
+        order = user1_client.post(
+            f"/api/swag/{item['id']}/order", json={"item_id": item["id"]}).json()
+        assert len(order["line_items"]) == 1
+        assert order["line_items"][0]["item_id"] == item["id"]
+        assert order["line_items"][0]["qty"] == 1
+
+
+class TestSwagCart:
+    def test_cart_checkout_creates_grouped_order(
+            self, admin_client, user1_client, user2_client, users):
+        shirt = _create_swag_item(admin_client, "Cart Shirt", 50)
+        mug = _create_swag_item(admin_client, "Cart Mug", 30)
+        _give_kudos_to(user2_client, users["user1"]["id"], 100)
+        admin_client.post("/api/kudos", json={
+            "receiver_id": users["user1"]["id"], "points": 100,
+            "value_key": "innovator", "message": "pts"})
+        resp = user1_client.post("/api/swag/order", json={
+            "items": [{"item_id": shirt["id"], "qty": 2},
+                      {"item_id": mug["id"], "qty": 1}],
+            "notes": "bundle please"})
+        assert resp.status_code == 200, resp.text
+        order = resp.json()
+        # One grouped order carrying every line, total = 2*50 + 1*30.
+        assert order["points_cost"] == 130
+        assert len(order["line_items"]) == 2
+        assert order["notes"] == "bundle please"
+
+    def test_cart_requires_auth(self, admin_client, client):
+        item = _create_swag_item(admin_client, "Auth Cart Item", 50)
+        resp = client.post("/api/swag/order", json={
+            "items": [{"item_id": item["id"], "qty": 1}]})
+        assert resp.status_code == 401
+
+    def test_empty_cart_rejected(self, user1_client):
+        resp = user1_client.post("/api/swag/order", json={"items": []})
+        assert resp.status_code == 422
+
+    def test_cart_total_exceeds_points(
+            self, admin_client, user1_client, user2_client, users):
+        item = _create_swag_item(admin_client, "Pricey", 100)
+        _give_kudos_to(user2_client, users["user1"]["id"], 100)
+        # Cart of 2 costs 200 but user only has 100.
+        resp = user1_client.post("/api/swag/order", json={
+            "items": [{"item_id": item["id"], "qty": 2}]})
+        assert resp.status_code == 400
+        assert "points" in resp.json()["detail"].lower()
+
+    def test_cart_consolidates_duplicate_items(
+            self, admin_client, user1_client, user2_client, users):
+        item = _create_swag_item(admin_client, "Dup Item", 20)
+        _give_kudos_to(user2_client, users["user1"]["id"], 100)
+        order = user1_client.post("/api/swag/order", json={
+            "items": [{"item_id": item["id"], "qty": 1},
+                      {"item_id": item["id"], "qty": 2}]}).json()
+        assert len(order["line_items"]) == 1
+        assert order["line_items"][0]["qty"] == 3
+        assert order["points_cost"] == 60
+
+
+class TestSwagStock:
+    def test_stock_decrements_on_order(
+            self, admin_client, user1_client, user2_client, users):
+        item = _create_swag_item(admin_client, "Limited Drop", 20, stock=5)
+        _give_kudos_to(user2_client, users["user1"]["id"], 100)
+        user1_client.post("/api/swag/order", json={
+            "items": [{"item_id": item["id"], "qty": 2}]})
+        after = admin_client.get("/api/swag").json()["items"]
+        limited = next(i for i in after if i["id"] == item["id"])
+        assert limited["stock"] == 3
+
+    def test_order_blocked_when_stock_insufficient(
+            self, admin_client, user1_client, user2_client, users):
+        item = _create_swag_item(admin_client, "Only Two", 10, stock=2)
+        _give_kudos_to(user2_client, users["user1"]["id"], 100)
+        resp = user1_client.post("/api/swag/order", json={
+            "items": [{"item_id": item["id"], "qty": 3}]})
+        assert resp.status_code == 409
+        # Nothing reserved when the order is rejected.
+        after = admin_client.get("/api/swag").json()["items"]
+        assert next(i for i in after if i["id"] == item["id"])["stock"] == 2
+
+    def test_out_of_stock_item_cannot_be_ordered(
+            self, admin_client, user1_client, user2_client, users):
+        item = _create_swag_item(admin_client, "Sold Out", 10, stock=0)
+        _give_kudos_to(user2_client, users["user1"]["id"], 100)
+        resp = user1_client.post(f"/api/swag/{item['id']}/order",
+                                 json={"item_id": item["id"]})
+        assert resp.status_code == 409
+
+    def test_unlimited_stock_never_blocks(
+            self, admin_client, user1_client, user2_client, users):
+        item = _create_swag_item(admin_client, "Unlimited", 10, stock=None)
+        _give_kudos_to(user2_client, users["user1"]["id"], 100)
+        resp = user1_client.post("/api/swag/order", json={
+            "items": [{"item_id": item["id"], "qty": 9}]})
+        assert resp.status_code == 200
+        after = admin_client.get("/api/swag").json()["items"]
+        assert next(i for i in after if i["id"] == item["id"])["stock"] is None
+
+    def test_rejected_order_restores_stock(
+            self, admin_client, user1_client, user2_client, users):
+        item = _create_swag_item(admin_client, "Restockable", 20, stock=4)
+        _give_kudos_to(user2_client, users["user1"]["id"], 100)
+        order = user1_client.post("/api/swag/order", json={
+            "items": [{"item_id": item["id"], "qty": 2}]}).json()
+        # Stock reserved down to 2.
+        mid = admin_client.get("/api/swag").json()["items"]
+        assert next(i for i in mid if i["id"] == item["id"])["stock"] == 2
+        # Admin rejects → reserved stock returns.
+        admin_client.post(f"/api/swag/orders/{order['id']}/transition",
+                          json={"transition_id": "t_reject1", "reason": "no budget"})
+        after = admin_client.get("/api/swag").json()["items"]
+        assert next(i for i in after if i["id"] == item["id"])["stock"] == 4
