@@ -104,7 +104,7 @@ All configuration is via environment variables (see `app/config.py`); everything
 | `SECRET_KEY` | `dev-secret-change-me` | Session signing secret — set a real value outside local demo use. |
 | `DEFAULT_MONTHLY_ALLOWANCE` | `100` | Points each employee can give away per month. |
 | `DEMO_LOGIN` | `true` | Set to `false` to disable the no-credential demo login (e.g. once real OAuth is configured for production). |
-| `SLACK_WEBHOOK_URL` | *(empty)* | Slack [Incoming Webhook](https://api.slack.com/messaging/webhooks) URL. When set, each kudos is announced to that channel. Left empty, Slack posting is disabled and a Slack outage can never affect giving kudos. |
+| `SLACK_WEBHOOK_URL` | *(empty)* | **Seeds** the Slack [Incoming Webhook](https://api.slack.com/messaging/webhooks) URL the first time settings are created. The live value is normally set in **Admin → Settings** (stored in the DB); the UI value takes precedence. When set, each kudos is announced to that channel. Left empty, Slack posting is disabled and a Slack outage can never affect giving kudos. |
 
 The CRM webhook key and all GitHub/CRM point weights are configured at runtime from the **Admin → Settings** panel rather than environment variables.
 
@@ -146,4 +146,4 @@ For a deeper dive into module responsibilities, data flows (giving kudos, swag o
 - TinyDB is single-process only — fine for this hackathon/demo scope, but not multi-process or load-balancer safe. A production deployment would move to Postgres or similar.
 - Session tokens are random UUIDs with no JWT signing or expiry.
 - Swag fulfilment stops at the "Shipped" workflow state — no physical fulfilment or gift-card issuing is implemented.
-- In-app notifications are the primary channel. Outbound **Slack** kudos announcements are supported via an Incoming Webhook (set `SLACK_WEBHOOK_URL`; disabled by default). Email/push notifications and a bidirectional Slack bot remain out of scope.
+- In-app notifications are the primary channel. Outbound **Slack** kudos announcements are supported via an Incoming Webhook, configured in Admin → Settings (or seeded from `SLACK_WEBHOOK_URL`); disabled by default. Email/push notifications and a bidirectional Slack bot remain out of scope.

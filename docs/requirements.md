@@ -113,8 +113,12 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 
 ### Slack integration
 - [x] **Outbound kudos announcements** — when a kudos is given, post an announcement (giver, receiver,
-  points, core value, message) to a Slack channel via an **Incoming Webhook** (`SLACK_WEBHOOK_URL`).
-- [x] **Disabled by default** — with no `SLACK_WEBHOOK_URL` set, `slack.notify_kudos()` is a silent
+  points, core value, message) to a Slack channel via an **Incoming Webhook**.
+- [x] **Webhook configured in the UI** — the webhook URL is set in **Admin → Settings** (stored in the
+  settings document as `slack_webhook_url`), validated to be a `https://hooks.slack.com/` URL. The
+  `SLACK_WEBHOOK_URL` env var only seeds the initial value; the UI value takes precedence. The URL is a
+  secret and is excluded from the public `/api/config` bootstrap (like `crm_api_key`).
+- [x] **Disabled by default** — with no webhook configured, `slack.notify_kudos()` is a silent
   no-op; the app runs identically in demo mode.
 - [x] **Failure isolation** — a Slack outage, timeout, or non-200 response must never fail the kudos
   request; errors are swallowed and logged, and `notify_kudos` returns `False`.
@@ -178,7 +182,7 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - [x] **Seed data** — 10 employees, 15 kudos, 13 GitHub contributions, 23 CRM events across 7 employees, 9 swag items.
   Seed intentionally timestamps a subset of events to `days_ago(0)` so "This month" leaderboard is
   never empty regardless of what day of the month the seed is run.
-- [x] **Test suite** — 192 pytest tests covering auth, kudos, feed, statistics, activity, swag,
+- [x] **Test suite** — 208 pytest tests covering auth, kudos, feed, statistics, activity, swag,
   workflow, CRM, GitHub, notifications, settings, roles, and Slack. Includes `TestSeedActivity` (guards
   against seed-timing regressions), `TestActivityFeed` (9 tests), `TestStatisticsAccess`/
   `TestStatisticsData` (admin-only dashboard, access control), and `TestRoleAPI` (role hierarchy
@@ -229,8 +233,9 @@ Legend: `[x]` done · `[ ]` planned / not yet built · ⛔ explicitly out of sco
 - **Auth:** GitHub OAuth (optional) + demo login; httponly cookie sessions.
 - **GitHub:** `httpx` against the GitHub Search API for merged PRs / closed issues.
 - **CRM:** Webhook endpoint + 6 event types + admin simulator; Salesforce adapter pattern documented.
-- **Slack:** Outbound-only via `httpx` POST to an Incoming Webhook (`SLACK_WEBHOOK_URL`); posts a
-  Block Kit kudos announcement on each kudos. Disabled by default; failures never break the request.
+- **Slack:** Outbound-only via `httpx` POST to an Incoming Webhook; URL configured in Admin → Settings
+  (`settings.slack_webhook_url`, seeded from `SLACK_WEBHOOK_URL`). Posts a Block Kit kudos announcement
+  on each kudos. Disabled by default; failures never break the request.
 - **Workflow:** JIRA-inspired state machine stored in TinyDB; full transition audit log per order.
 - **Frontend:** Vanilla HTML/CSS/JS SPA (no build step), OpenTeams palette, Airbnb-minimal styling.
 - **venv:** `~/miniconda3/bin/python -m venv .venv` (requires Python 3.14 from Miniconda, not system Python).
