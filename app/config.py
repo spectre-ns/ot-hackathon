@@ -32,16 +32,13 @@ DEFAULT_MONTHLY_ALLOWANCE = int(os.getenv("DEFAULT_MONTHLY_ALLOWANCE", "100"))
 DEMO_LOGIN = os.getenv("DEMO_LOGIN", "true").lower() == "true"
 
 # --- Slack (optional) -----------------------------------------------------
-# Post kudos announcements to a Slack channel via an Incoming Webhook.
-# Create one at https://api.slack.com/messaging/webhooks and paste the URL
-# here. Leave unset to keep Slack posting disabled (the default) — the app
-# works fine without it.
+# Post kudos announcements to a Slack channel via an Incoming Webhook. The
+# webhook URL is normally configured at runtime in Admin → Settings (stored in
+# the DB). This env var only SEEDS the initial value the first time settings are
+# created, so an operator can pre-provision it; after that the UI value wins.
+# Create a webhook at https://api.slack.com/messaging/webhooks.
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
 
 
 def github_oauth_enabled() -> bool:
     return bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET)
-
-
-def slack_enabled() -> bool:
-    return bool(SLACK_WEBHOOK_URL)

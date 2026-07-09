@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 from tinydb import Query, TinyDB
 
-from .config import DATABASE_FILE, DEFAULT_MONTHLY_ALLOWANCE
+from .config import DATABASE_FILE, DEFAULT_MONTHLY_ALLOWANCE, SLACK_WEBHOOK_URL
 from .crm_events import CRM_SETTINGS_DEFAULTS
 
 _lock = threading.RLock()
@@ -280,6 +280,8 @@ def get_settings() -> dict:
                 # CRM accumulation on by default — CRM events always award points.
                 "crm_accumulation_enabled": True,
                 "crm_api_key": secrets.token_urlsafe(24),
+                # Slack Incoming Webhook URL; seeded from env, editable in the UI.
+                "slack_webhook_url": SLACK_WEBHOOK_URL,
                 **CRM_SETTINGS_DEFAULTS,
             }
             t.insert(doc)
@@ -290,6 +292,7 @@ def get_settings() -> dict:
             "github_accumulation_enabled": False,
             "crm_accumulation_enabled": True,
             "crm_api_key": secrets.token_urlsafe(24),
+            "slack_webhook_url": SLACK_WEBHOOK_URL,
             **CRM_SETTINGS_DEFAULTS,
         }
         updates = {k: v for k, v in missing.items() if k not in row}

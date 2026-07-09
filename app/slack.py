@@ -3,7 +3,11 @@
 This is an OUTBOUND-only integration: when someone gives kudos, we fire a
 single message to a pre-configured Slack channel. It intentionally does the
 simplest thing that works — an Incoming Webhook (one URL, one channel, no
-OAuth scopes) — rather than a full bot. See ``config.SLACK_WEBHOOK_URL``.
+OAuth scopes) — rather than a full bot.
+
+The webhook URL is configured at runtime in Admin → Settings and stored in the
+DB (``settings.slack_webhook_url``); ``config.SLACK_WEBHOOK_URL`` only seeds the
+initial value. Read the effective URL via ``webhook_url()``.
 
 Design rules:
   * If Slack isn't configured, every function is a silent no-op. The app must
@@ -18,10 +22,22 @@ import logging
 
 import httpx
 
-from . import config
+from . import db
 from .values import value_or_default
 
 log = logging.getLogger("kudos.slack")
+
+
+def webhook_url() -> str:
+    """The effective Slack webhook URL from settings ("" if unset/disabled)."""
+    try:
+        return (db.get_settings().get("slack_webhook_url") or "").strip()
+    except Exception:  # pragma: no cover - defensive: never break the caller
+        return ""
+
+
+def enabled() -> bool:
+    return bool(webhook_url())
 
 
 def _post(text: str, blocks: list | None = None) -> bool:
@@ -30,13 +46,14 @@ def _post(text: str, blocks: list | None = None) -> bool:
     Returns True on success, False if disabled or the request failed. Never
     raises — Slack being unreachable must not fail the caller.
     """
-    if not config.slack_enabled():
+    url = webhook_url()
+    if not url:
         return False
     payload: dict = {"text": text}
     if blocks:
         payload["blocks"] = blocks
     try:
-        resp = httpx.post(config.SLACK_WEBHOOK_URL, json=payload, timeout=5.0)
+        resp = httpx.post(url, json=payload, timeout=5.0)
     except httpx.HTTPError as e:
         log.warning("Slack post failed: %s", e)
         return False
@@ -51,7 +68,7 @@ def _post(text: str, blocks: list | None = None) -> bool:
 def notify_kudos(giver: dict, receiver: dict, points: int, value_key: str,
                  message: str) -> bool:
     """Announce a kudos to Slack. No-op (returns False) when Slack is disabled."""
-    if not config.slack_enabled():
+    if not enabled():
         return False
 
     value = value_or_default(value_key)

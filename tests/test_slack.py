@@ -1,8 +1,10 @@
 """Tests for the outbound Slack integration (Incoming Webhook).
 
-Slack is disabled unless SLACK_WEBHOOK_URL is configured. When disabled every
-function is a silent no-op; when enabled a kudos post fires exactly one webhook
-request. Crucially, a failing/unreachable Slack must never break giving kudos.
+The webhook URL lives in Settings (``settings.slack_webhook_url``) and is
+editable via Admin → Settings. Slack is disabled unless it is set. When
+disabled every function is a silent no-op; when enabled a kudos post fires
+exactly one webhook request. A failing/unreachable Slack must never break
+giving kudos.
 """
 from __future__ import annotations
 
@@ -20,11 +22,16 @@ class _FakeResponse:
 
 
 @pytest.fixture
-def capture_slack(monkeypatch):
-    """Enable Slack and capture every httpx.post call made by app.slack."""
-    import app.config as cfg
+def enable_slack(seeded_db):
+    """Set a webhook URL in settings so Slack is enabled for the test."""
+    import app.db as adb
+    adb.update_settings(slack_webhook_url=WEBHOOK)
+
+
+@pytest.fixture
+def capture_slack(enable_slack, monkeypatch):
+    """Slack enabled + every httpx.post made by app.slack captured."""
     import app.slack as slk
-    monkeypatch.setattr(cfg, "SLACK_WEBHOOK_URL", WEBHOOK)
     calls = []
 
     def fake_post(url, json=None, timeout=None):
@@ -36,16 +43,13 @@ def capture_slack(monkeypatch):
 
 
 class TestSlackDisabled:
-    def test_disabled_by_default(self):
-        import app.config as cfg
-        # Default config has no webhook set.
-        assert cfg.slack_enabled() is False
-
-    def test_notify_is_noop_when_disabled(self, monkeypatch):
-        import app.config as cfg
+    def test_disabled_by_default(self, seeded_db):
         import app.slack as slk
-        monkeypatch.setattr(cfg, "SLACK_WEBHOOK_URL", "")
+        # Fresh settings have no webhook configured.
+        assert slk.enabled() is False
 
+    def test_notify_is_noop_when_disabled(self, seeded_db, monkeypatch):
+        import app.slack as slk
         posted = []
         monkeypatch.setattr(slk.httpx, "post",
                             lambda *a, **k: posted.append(1))
@@ -57,6 +61,11 @@ class TestSlackDisabled:
 
 
 class TestSlackEnabled:
+    def test_enabled_when_webhook_set(self, enable_slack):
+        import app.slack as slk
+        assert slk.enabled() is True
+        assert slk.webhook_url() == WEBHOOK
+
     def test_notify_posts_once(self, capture_slack):
         import app.slack as slk
         result = slk.notify_kudos(
@@ -90,10 +99,8 @@ class TestSlackEnabled:
 
 
 class TestSlackFailureIsolation:
-    def test_network_error_returns_false_not_raises(self, monkeypatch):
-        import app.config as cfg
+    def test_network_error_returns_false_not_raises(self, enable_slack, monkeypatch):
         import app.slack as slk
-        monkeypatch.setattr(cfg, "SLACK_WEBHOOK_URL", WEBHOOK)
 
         def boom(*a, **k):
             raise httpx.ConnectError("slack down")
@@ -103,15 +110,37 @@ class TestSlackFailureIsolation:
         assert slk.notify_kudos(
             {"name": "Ada"}, {"name": "Alan"}, 5, "mentor", "x") is False
 
-    def test_non_200_returns_false(self, monkeypatch):
-        import app.config as cfg
+    def test_non_200_returns_false(self, enable_slack, monkeypatch):
         import app.slack as slk
-        monkeypatch.setattr(cfg, "SLACK_WEBHOOK_URL", WEBHOOK)
         monkeypatch.setattr(
             slk.httpx, "post",
             lambda *a, **k: _FakeResponse(404, "no_service"))
         assert slk.notify_kudos(
             {"name": "Ada"}, {"name": "Alan"}, 5, "mentor", "x") is False
+
+
+class TestSlackSettingsEndpoint:
+    def test_admin_can_set_webhook_via_settings(self, admin_client):
+        body = _settings_payload(slack_webhook_url=WEBHOOK)
+        resp = admin_client.put("/api/settings", json=body)
+        assert resp.status_code == 200
+        assert resp.json()["slack_webhook_url"] == WEBHOOK
+
+    def test_admin_can_clear_webhook(self, admin_client):
+        admin_client.put("/api/settings", json=_settings_payload(slack_webhook_url=WEBHOOK))
+        resp = admin_client.put("/api/settings", json=_settings_payload(slack_webhook_url=""))
+        assert resp.status_code == 200
+        assert resp.json()["slack_webhook_url"] == ""
+
+    def test_invalid_webhook_url_rejected(self, admin_client):
+        body = _settings_payload(slack_webhook_url="https://evil.example.com/hook")
+        resp = admin_client.put("/api/settings", json=body)
+        assert resp.status_code == 422
+
+    def test_webhook_not_leaked_in_public_config(self, admin_client, client):
+        admin_client.put("/api/settings", json=_settings_payload(slack_webhook_url=WEBHOOK))
+        data = client.get("/api/config").json()
+        assert "slack_webhook_url" not in data.get("settings", {})
 
 
 class TestKudosEndpointIntegration:
@@ -127,10 +156,8 @@ class TestKudosEndpointIntegration:
         assert len(capture_slack) == 1
         assert receiver["name"] in capture_slack[0]["json"]["text"]
 
-    def test_kudos_succeeds_when_slack_fails(self, user1_client, users, monkeypatch):
-        import app.config as cfg
+    def test_kudos_succeeds_when_slack_fails(self, user1_client, users, enable_slack, monkeypatch):
         import app.slack as slk
-        monkeypatch.setattr(cfg, "SLACK_WEBHOOK_URL", WEBHOOK)
 
         def boom(*a, **k):
             raise httpx.ConnectError("slack down")
@@ -148,9 +175,7 @@ class TestKudosEndpointIntegration:
         assert resp.json()["points"] == 10
 
     def test_no_slack_call_when_disabled(self, user1_client, users, monkeypatch):
-        import app.config as cfg
         import app.slack as slk
-        monkeypatch.setattr(cfg, "SLACK_WEBHOOK_URL", "")
         posted = []
         monkeypatch.setattr(slk.httpx, "post", lambda *a, **k: posted.append(1))
         receiver = users["user2"]
@@ -162,3 +187,22 @@ class TestKudosEndpointIntegration:
         })
         assert resp.status_code == 200
         assert posted == []
+
+
+def _settings_payload(**overrides) -> dict:
+    """A complete, valid SettingsBody payload with optional overrides."""
+    body = {
+        "pr_points": 10,
+        "issue_points": 5,
+        "monthly_allowance": 100,
+        "github_accumulation_enabled": False,
+        "crm_accumulation_enabled": True,
+        "crm_deal_closed_points": 25,
+        "crm_contract_renewed_points": 20,
+        "crm_escalation_resolved_points": 15,
+        "crm_nps_positive_points": 10,
+        "crm_ticket_resolved_points": 8,
+        "crm_customer_call_points": 5,
+    }
+    body.update(overrides)
+    return body

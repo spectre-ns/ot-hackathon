@@ -1,7 +1,7 @@
 """Pydantic request bodies."""
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class DemoLoginBody(BaseModel):
@@ -34,6 +34,17 @@ class SettingsBody(BaseModel):
     crm_nps_positive_points: int = Field(ge=0, le=1000)
     crm_ticket_resolved_points: int = Field(ge=0, le=1000)
     crm_customer_call_points: int = Field(ge=0, le=1000)
+    # Slack Incoming Webhook URL. Empty string disables Slack posting.
+    slack_webhook_url: str = Field(default="", max_length=800)
+
+    @field_validator("slack_webhook_url")
+    @classmethod
+    def _validate_slack_url(cls, v: str) -> str:
+        v = (v or "").strip()
+        if v and not v.startswith("https://hooks.slack.com/"):
+            raise ValueError(
+                "Slack webhook URL must start with https://hooks.slack.com/")
+        return v
 
 
 class SwagItemBody(BaseModel):

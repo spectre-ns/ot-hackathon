@@ -773,6 +773,14 @@ function renderAdminSettings(el, s) {
             <div><div class="wf-label">${esc(et.label)}</div><div class="wf-desc">${esc(et.desc)}</div></div>
             <input type="number" id="${et.settings_key}" min="0" max="1000" value="${s[et.settings_key]||et.default_points}" style="width:96px">
           </div>`).join("")}
+        <div class="admin-group-title">Slack integration</div>
+        <div class="weight-field">
+          <div>
+            <div class="wf-label">Kudos announcement webhook</div>
+            <div class="wf-desc">Slack <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noopener">Incoming Webhook</a> URL. When set, every kudos is posted to that channel. Leave blank to disable.</div>
+          </div>
+          <input type="text" id="slack_webhook_url" placeholder="https://hooks.slack.com/services/…" value="${esc(s.slack_webhook_url||"")}" style="width:320px;max-width:100%">
+        </div>
         <div style="margin-top:18px;text-align:right">
           <button class="btn btn-primary" type="submit">Save settings</button>
         </div>
@@ -787,6 +795,7 @@ function renderAdminSettings(el, s) {
         crm_accumulation_enabled: document.getElementById("crm_accumulation_enabled").checked,
         pr_points: parseInt(document.getElementById("pr_points").value, 10),
         issue_points: parseInt(document.getElementById("issue_points").value, 10),
+        slack_webhook_url: document.getElementById("slack_webhook_url").value.trim(),
       };
       (state.config.crm_event_types||[]).forEach(et => {
         body[et.settings_key] = parseInt(document.getElementById(et.settings_key).value, 10);

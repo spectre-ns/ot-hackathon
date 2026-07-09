@@ -113,7 +113,10 @@ def set_session_cookie(response: Response, token: str) -> None:
 @app.get("/api/config")
 def get_config():
     settings = db.get_settings()
-    public_settings = {k: v for k, v in settings.items() if k != "crm_api_key"}
+    # Never expose secrets in the unauthenticated bootstrap: the CRM API key and
+    # the Slack webhook URL (anyone with it can post to the channel).
+    _secret_keys = {"crm_api_key", "slack_webhook_url"}
+    public_settings = {k: v for k, v in settings.items() if k not in _secret_keys}
     return {
         "github_oauth_enabled": github_oauth_enabled(),
         "core_values": CORE_VALUES,
